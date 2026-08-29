@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </linearGradient>
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0b90b"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <!-- Background with rounded corners -->
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
+  <rect width="504" height="504" x="4" y="4" rx="124" fill="none" stroke="#1f293d" stroke-width="8"/>
+  
+  <!-- Icon Graphics: Currency exchange arrows & symbols -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="url(#primaryGrad)" stroke-width="24" stroke-dasharray="700" stroke-dashoffset="100" stroke-linecap="round"/>
+  
+  <!-- Central Exchange Icon -->
+  <g transform="translate(156, 156) scale(0.39)">
+    <path fill="url(#primaryGrad)" d="M504 256c0 137-111 248-248 248S8 393 8 256 119 8 256 8s248 111 248 248zm-143.6-28.9L288 154.7v53.3h-96c-17.7 0-32 14.3-32 32v32c0 17.7 14.3 32 32 32h96v53.3l72.4-72.4c6.2-6.2 6.2-16.4 0-22.6z"/>
+  </g>
+</svg>
