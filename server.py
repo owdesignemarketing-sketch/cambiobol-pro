@@ -7,10 +7,10 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
 
-# Cache de cotacoes em memoria com valores de seguranca padrao
+# Cache de cotacoes em memoria
 quotes_cache = {
     "last_updated": time.time(),
-    "spot_usdt_brl": {"bid": 5.20, "ask": 5.21, "symbol": "USDTBRL"},
+    "spot_usdt_brl": {"bid": 5.21, "ask": 5.213, "symbol": "USDTBRL"},
     "p2p_usdt_bob": [],
     "p2p_usdt_brl": [],
     "best_p2p_bob": 12.10,
@@ -22,14 +22,22 @@ quotes_cache = {
 
 HISTORY_MAX_ITEMS = 60
 
-HEADERS = {
-    'Accept': '*/*',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Content-Type': 'application/json',
+HEADERS_SPOT = {
+    'Accept': 'application/json',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+}
+
+HEADERS_P2P = {
+    'Accept': '*/*',
+    'Accept-Language': 'es-LA,es;q=0.9,pt-BR;q=0.8,en-US;q=0.7',
+    'Cache-Control': 'no-cache',
+    'Client-Type': 'web',
+    'Content-Type': 'application/json',
+    'Origin': 'https://p2p.binance.com',
+    'Pragma': 'no-cache',
+    'Referer': 'https://p2p.binance.com/es-LA/trade/sell/USDT?fiat=BOB&payment=ALL',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'lang': 'es-LA'
 }
 
 BINANCE_SPOT_ENDPOINTS = [
@@ -41,10 +49,10 @@ BINANCE_SPOT_ENDPOINTS = [
 ]
 
 def fetch_binance_spot_usdt_brl():
-    """Busca o preco Spot USDT/BRL com multiplos fallbacks de endpoint."""
+    """Busca o preco Spot USDT/BRL com multiplos fallbacks."""
     for url in BINANCE_SPOT_ENDPOINTS:
         try:
-            resp = requests.get(url, headers=HEADERS, timeout=4)
+            resp = requests.get(url, headers=HEADERS_SPOT, timeout=4)
             if resp.status_code == 200:
                 data = resp.json()
                 ask = float(data.get("askPrice", 0))
@@ -55,12 +63,18 @@ def fetch_binance_spot_usdt_brl():
                         "ask": ask,
                         "symbol": "USDTBRL"
                     }
-        except Exception as e:
+        except Exception:
             continue
     return None
 
+def clean_str(val):
+    """Sanitiza strings de comerciantes para evitar erros de encoding."""
+    if not val:
+        return "Comerciante"
+    return str(val).encode('utf-8', 'ignore').decode('utf-8')
+
 def fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=12):
-    """Busca anuncios no P2P da Binance com tratamento seguro."""
+    """Busca anuncios no P2P da Binance com headers web completos."""
     try:
         url = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
         payload = {
@@ -73,20 +87,20 @@ def fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=12):
             "rows": rows,
             "tradeType": trade_type
         }
-        resp = requests.post(url, json=payload, headers=HEADERS, timeout=5)
+        resp = requests.post(url, json=payload, headers=HEADERS_P2P, timeout=5)
         if resp.status_code == 200:
             res_data = resp.json()
             ads_list = []
             for item in res_data.get("data", []):
                 adv = item.get("adv", {})
                 advertiser = item.get("advertiser", {})
-                methods = [m.get("tradeMethodName") for m in adv.get("tradeMethods", []) if m.get("tradeMethodName")]
+                methods = [clean_str(m.get("tradeMethodName")) for m in adv.get("tradeMethods", []) if m.get("tradeMethodName")]
                 price = float(adv.get("price", 0))
                 if price > 0:
                     ads_list.append({
-                        "adv_id": adv.get("advNo"),
-                        "nick_name": advertiser.get("nickName", "Comerciante"),
-                        "month_order_count": advertiser.get("monthOrderCount", 0),
+                        "adv_id": clean_str(adv.get("advNo")),
+                        "nick_name": clean_str(advertiser.get("nickName", "Comerciante")),
+                        "month_order_count": int(advertiser.get("monthOrderCount", 0)),
                         "month_finish_rate": round(float(advertiser.get("monthFinishRate", 0) * 100), 1),
                         "price": price,
                         "min_amount": float(adv.get("minSingleTransAmount", 0)),
@@ -158,7 +172,7 @@ def index():
 @app.route('/api/quotes', methods=['GET'])
 def get_quotes():
     try:
-        if not quotes_cache.get("spot_usdt_brl"):
+        if not quotes_cache.get("spot_usdt_brl") or not quotes_cache.get("p2p_usdt_bob"):
             update_all_quotes()
             
         all_methods = set()
