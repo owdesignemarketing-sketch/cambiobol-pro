@@ -66,6 +66,7 @@ const p2pTableBody = document.getElementById('p2pTableBody');
 const copyWhatsappBtn = document.getElementById('copyWhatsappBtn');
 const shareWhatsappBtn = document.getElementById('shareWhatsappBtn');
 const installPwaBtn = document.getElementById('installPwaBtn');
+const installPwaBtnDesktop = document.getElementById('installPwaBtnDesktop');
 const toast = document.getElementById('toast');
 const toastMsg = document.getElementById('toastMsg');
 
@@ -96,29 +97,30 @@ function setupPwa() {
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
-        if (installPwaBtn) {
-            installPwaBtn.classList.remove('hidden');
-        }
+        if (installPwaBtn) installPwaBtn.classList.remove('hidden');
+        if (installPwaBtnDesktop) installPwaBtnDesktop.classList.remove('hidden');
     });
 
-    if (installPwaBtn) {
-        installPwaBtn.addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    installPwaBtn.classList.add('hidden');
-                    showToast('App instalado com sucesso na tela inicial!');
-                }
-                deferredPrompt = null;
-            } else {
-                showToast('Para instalar: no navegador, clique nos 3 pontinhos e escolha "Instalar aplicativo"');
+    const handleInstall = async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                if (installPwaBtn) installPwaBtn.classList.add('hidden');
+                if (installPwaBtnDesktop) installPwaBtnDesktop.classList.add('hidden');
+                showToast('App instalado com sucesso na tela inicial!');
             }
-        });
-    }
+            deferredPrompt = null;
+        } else {
+            showToast('Para instalar: no navegador, clique nos 3 pontinhos e escolha "Instalar aplicativo"');
+        }
+    };
+
+    if (installPwaBtn) installPwaBtn.addEventListener('click', handleInstall);
+    if (installPwaBtnDesktop) installPwaBtnDesktop.addEventListener('click', handleInstall);
 }
 
-// Configuração do Gráfico Chart.js
+// Configuração do Gráfico Chart.js com suporte Touch Mobile
 function initChart() {
     const ctx = document.getElementById('rateHistoryChart').getContext('2d');
     historyChart = new Chart(ctx, {
@@ -129,23 +131,26 @@ function initChart() {
                 label: 'Câmbio BRL ➔ BOB',
                 data: [],
                 borderColor: '#10b981',
-                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
                 borderWidth: 2.5,
                 tension: 0.25,
                 fill: true,
                 pointBackgroundColor: '#10b981',
                 pointBorderColor: '#ffffff',
-                pointBorderWidth: 1.5,
-                pointRadius: 3.5,
-                pointHoverRadius: 6.5
+                pointBorderWidth: 2,
+                pointRadius: 4.5, // Ponto destacado
+                pointHoverRadius: 8.5,
+                pointHitRadius: 35 // Área de toque de 35px para o dedo no celular
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
             interaction: {
                 intersect: false,
-                mode: 'index',
+                mode: 'nearest',
+                axis: 'x'
             },
             plugins: {
                 legend: { display: false },
@@ -155,9 +160,11 @@ function initChart() {
                     bodyColor: '#f8fafc',
                     borderColor: '#374151',
                     borderWidth: 1,
-                    padding: 10,
+                    padding: 12,
                     boxPadding: 4,
                     usePointStyle: true,
+                    titleFont: { size: 12, weight: 'bold' },
+                    bodyFont: { size: 12 },
                     callbacks: {
                         title: function(context) {
                             const index = context[0].dataIndex;
@@ -183,12 +190,16 @@ function initChart() {
             },
             scales: {
                 x: {
-                    grid: { color: 'rgba(31, 41, 61, 0.5)' },
-                    ticks: { color: '#94a3b8', font: { size: 10 } }
+                    grid: { color: 'rgba(31, 41, 61, 0.4)' },
+                    ticks: { 
+                        color: '#94a3b8', 
+                        font: { size: 9 },
+                        maxTicksLimit: 8 // Limita número de labels no eixo X para não poluir tela do celular
+                    }
                 },
                 y: {
-                    grid: { color: 'rgba(31, 41, 61, 0.5)' },
-                    ticks: { color: '#94a3b8', font: { size: 10 } }
+                    grid: { color: 'rgba(31, 41, 61, 0.4)' },
+                    ticks: { color: '#94a3b8', font: { size: 9 } }
                 }
             }
         }
@@ -283,13 +294,13 @@ function setupQuickAmountButtons() {
 function setChartTimeframe(tf) {
     currentTimeframe = tf;
     if (tf === '1h') {
-        btnTimeframe1h.className = 'timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[11px]';
-        btnTimeframe24h.className = 'timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[11px]';
-        chartSubtitle.textContent = '*Passe o cursor sobre os pontos para ver o câmbio a cada 1 minuto.';
+        btnTimeframe1h.className = 'timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[10px] sm:text-[11px]';
+        btnTimeframe24h.className = 'timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[10px] sm:text-[11px]';
+        chartSubtitle.textContent = '*Toque ou deslize sobre os pontos para ver o câmbio a cada 1 minuto.';
     } else {
-        btnTimeframe24h.className = 'timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[11px]';
-        btnTimeframe1h.className = 'timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[11px]';
-        chartSubtitle.textContent = '*Passe o cursor sobre os pontos para ver o câmbio exato por hora.';
+        btnTimeframe24h.className = 'timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[10px] sm:text-[11px]';
+        btnTimeframe1h.className = 'timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[10px] sm:text-[11px]';
+        chartSubtitle.textContent = '*Toque ou deslize sobre os pontos para ver o câmbio exato por hora.';
     }
     if (currentQuotes) {
         renderHistoryChart(currentQuotes);
@@ -299,8 +310,8 @@ function setChartTimeframe(tf) {
 function setMode(mode) {
     currentMode = mode;
     if (mode === 'BRL_TO_BOB') {
-        tabBrlToBob.className = 'tab-btn px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow-md transition-all flex items-center gap-1.5';
-        tabBobToBrl.className = 'tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5';
+        tabBrlToBob.className = 'tab-btn py-2 px-3 rounded-lg bg-blue-600 text-white shadow-md transition-all flex items-center justify-center gap-1.5';
+        tabBobToBrl.className = 'tab-btn py-2 px-3 rounded-lg text-slate-400 hover:text-white transition-all flex items-center justify-center gap-1.5';
         inputAmountLabel.textContent = 'Valor a receber no PIX (Reais - BRL)';
         inputCurrencySymbol.textContent = 'R$';
         modeDescriptionBadge.textContent = 'Cliente envia R$ ➔ Recebe Bs.';
@@ -316,15 +327,15 @@ function setMode(mode) {
         step4Label.textContent = '4. Custo p/ BOB';
 
         quickAmountButtonsContainer.innerHTML = `
-            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="500">500</button>
-            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="1000">1K</button>
-            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="2000">2K</button>
-            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="5000">5K</button>
+            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="500">500</button>
+            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="1000">1K</button>
+            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="2000">2K</button>
+            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="5000">5K</button>
         `;
         if (inputAmount.value === '5000') inputAmount.value = '1000';
     } else {
-        tabBobToBrl.className = 'tab-btn px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow-md transition-all flex items-center gap-1.5';
-        tabBrlToBob.className = 'tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5';
+        tabBobToBrl.className = 'tab-btn py-2 px-3 rounded-lg bg-blue-600 text-white shadow-md transition-all flex items-center justify-center gap-1.5';
+        tabBrlToBob.className = 'tab-btn py-2 px-3 rounded-lg text-slate-400 hover:text-white transition-all flex items-center justify-center gap-1.5';
         inputAmountLabel.textContent = 'Valor solicitado pelo cliente (Bolivianos - BOB)';
         inputCurrencySymbol.textContent = 'Bs.';
         modeDescriptionBadge.textContent = 'Cliente precisa de Bs. ➔ Cobrar R$ no PIX';
@@ -340,10 +351,10 @@ function setMode(mode) {
         step4Label.textContent = '4. Cobrar p/ BOB';
 
         quickAmountButtonsContainer.innerHTML = `
-            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="2000">2K</button>
-            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="5000">5K</button>
-            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="10000">10K</button>
-            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="20000">20K</button>
+            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="2000">2K</button>
+            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="5000">5K</button>
+            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="10000">10K</button>
+            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="20000">20K</button>
         `;
         if (inputAmount.value === '1000') inputAmount.value = '5000';
     }
@@ -354,9 +365,9 @@ function setMode(mode) {
 function updateMarginButtonsActiveState() {
     document.querySelectorAll('.margin-btn').forEach(btn => {
         if (currentMarginType === 'PERCENT' && parseFloat(btn.dataset.val) === currentMarginValue) {
-            btn.className = 'margin-btn px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95';
+            btn.className = 'margin-btn px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] sm:text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95 flex-1 sm:flex-none text-center';
         } else {
-            btn.className = 'margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95';
+            btn.className = 'margin-btn px-2 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-[11px] sm:text-xs font-bold hover:bg-slate-700 transition-all active:scale-95 flex-1 sm:flex-none text-center';
         }
     });
 }
@@ -447,7 +458,7 @@ function renderKPIs(data) {
     kpiCommercialInverse.textContent = `R$ ${commercialInverse.toFixed(4)}`;
 }
 
-// Renderiza Tabela de Ofertas P2P com Badge de Verificados
+// Renderiza Tabela de Ofertas P2P
 function renderP2PTable(ads) {
     if (!ads || ads.length === 0) {
         p2pTableBody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-slate-500">Nenhum anunciante verificado online no momento.</td></tr>`;
@@ -457,38 +468,37 @@ function renderP2PTable(ads) {
     let html = '';
     ads.slice(0, 8).forEach((ad, idx) => {
         const isBest = idx === 0;
-        const methodsBadges = ad.trade_methods.slice(0, 3).map(m => {
+        const methodsBadges = ad.trade_methods.slice(0, 2).map(m => {
             let color = 'bg-slate-800 text-slate-300 border-slate-700';
             if (m.toLowerCase().includes('union')) color = 'bg-blue-500/10 text-blue-300 border-blue-500/30';
             if (m.toLowerCase().includes('nacional') || m.toLowerCase().includes('bnb')) color = 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30';
             if (m.toLowerCase().includes('credito') || m.toLowerCase().includes('bcp')) color = 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30';
-            return `<span class="inline-block px-1.5 py-0.2 text-[9px] rounded border ${color} font-medium mr-1 mb-1">${m}</span>`;
+            return `<span class="inline-block px-1.5 py-0.2 text-[8px] sm:text-[9px] rounded border ${color} font-medium mr-1 mb-0.5 truncate max-w-[90px]">${m}</span>`;
         }).join('');
 
         html += `
             <tr class="hover:bg-slate-800/40 transition-colors ${isBest ? 'bg-binanceYellow/5' : ''}">
-                <td class="py-2.5 pr-2">
-                    <div class="flex items-center gap-1.5 flex-wrap">
-                        <span class="font-bold text-white text-xs">${ad.nick_name}</span>
-                        <span class="text-[9px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold rounded flex items-center gap-0.5">
-                            <i class="fa-solid fa-circle-check text-[8px]"></i> Verificado
+                <td class="py-2 sm:py-2.5 pr-1 sm:pr-2">
+                    <div class="flex items-center gap-1 flex-wrap">
+                        <span class="font-bold text-white text-[11px] sm:text-xs truncate max-w-[100px] sm:max-w-[130px]">${ad.nick_name}</span>
+                        <span class="text-[8px] sm:text-[9px] px-1 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold rounded flex items-center gap-0.5">
+                            <i class="fa-solid fa-circle-check text-[7px]"></i> Verif.
                         </span>
-                        ${isBest ? '<span class="text-[9px] px-1 py-0.2 bg-binanceYellow text-black font-extrabold rounded">MELHOR</span>' : ''}
                     </div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">
-                        <span class="text-emerald-400 font-semibold">${ad.month_finish_rate}%</span> (${ad.month_order_count} ordens concluídas)
+                    <div class="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">
+                        <span class="text-emerald-400 font-semibold">${ad.month_finish_rate}%</span> (${ad.month_order_count} ordens)
                     </div>
-                    <div class="mt-1 flex flex-wrap">${methodsBadges}</div>
+                    <div class="mt-0.5 flex flex-wrap">${methodsBadges}</div>
                 </td>
-                <td class="py-2.5 text-right font-mono font-bold text-binanceYellow text-xs align-top">
-                    ${ad.price.toFixed(2)} <span class="text-[10px] text-slate-400 font-normal">Bs</span>
+                <td class="py-2 sm:py-2.5 text-right font-mono font-bold text-binanceYellow text-[11px] sm:text-xs align-top">
+                    ${ad.price.toFixed(2)} <span class="text-[9px] sm:text-[10px] text-slate-400 font-normal">Bs</span>
                 </td>
-                <td class="py-2.5 text-right font-mono text-[11px] text-slate-300 align-top">
+                <td class="py-2 sm:py-2.5 text-right font-mono text-[10px] sm:text-[11px] text-slate-300 align-top">
                     <div>${formatNumber(ad.min_amount)}</div>
-                    <div class="text-[9px] text-slate-500">até ${formatNumber(ad.max_amount)}</div>
+                    <div class="text-[8px] sm:text-[9px] text-slate-500">até ${formatNumber(ad.max_amount)}</div>
                 </td>
-                <td class="py-2.5 text-center align-top">
-                    <button onclick="applyP2pPrice(${ad.price})" class="px-2.5 py-1 bg-cardBorder hover:bg-binanceYellow hover:text-black rounded text-[10px] font-bold text-slate-200 transition-all shadow-sm">
+                <td class="py-2 sm:py-2.5 text-center align-top">
+                    <button onclick="applyP2pPrice(${ad.price})" class="px-2 py-1 bg-cardBorder hover:bg-binanceYellow hover:text-black rounded text-[9px] sm:text-[10px] font-bold text-slate-200 transition-all shadow-sm">
                         Usar
                     </button>
                 </td>
@@ -510,14 +520,14 @@ function renderHistoryChart(data) {
     if (!historyChart) return;
     
     const historyList = currentTimeframe === '24h' ? (data.history_24h || []) : (data.history_1h || []);
-    if (historyList.length === 0) return;
+    if (!historyList || historyList.length === 0) return;
     
     const labels = historyList.map(h => h.timestamp);
     const dataRates = historyList.map(h => h.rate_brl_bob);
     
     historyChart.data.labels = labels;
     historyChart.data.datasets[0].data = dataRates;
-    historyChart.update('none');
+    historyChart.update();
 }
 
 // Executa Simulação

@@ -40,155 +40,170 @@
     <!-- Estilo customizado -->
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-darkBg text-slate-100 min-h-screen font-sans antialiased selection:bg-binanceYellow selection:text-black">
+<body class="bg-darkBg text-slate-100 min-h-screen font-sans antialiased selection:bg-binanceYellow selection:text-black pb-10">
 
-    <!-- Top Navigation Bar -->
-    <header class="border-b border-cardBorder bg-cardBg/90 backdrop-blur-md sticky top-0 z-50 px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-binanceYellow to-emerald-400 flex items-center justify-center shadow-lg shadow-yellow-500/10">
-                <i class="fa-solid fa-arrow-right-arrow-left text-darkBg text-lg font-black"></i>
-            </div>
-            <div>
-                <div class="flex items-center gap-2">
-                    <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-binanceYellow bg-clip-text text-transparent">CâmbioBol <span class="text-xs px-2 py-0.5 rounded-full bg-binanceYellow/20 text-binanceYellow border border-binanceYellow/30 font-semibold uppercase">PRO</span></h1>
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                        Ao Vivo
-                    </span>
+    <!-- Top Navigation Bar (Responsivo Mobile e Desktop) -->
+    <header class="border-b border-cardBorder bg-cardBg/95 backdrop-blur-md sticky top-0 z-50 px-3 sm:px-6 lg:px-8 py-3">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            
+            <!-- Logo & Status -->
+            <div class="flex items-center justify-between w-full sm:w-auto">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-binanceYellow to-emerald-400 flex items-center justify-center shadow-lg shadow-yellow-500/10 flex-shrink-0">
+                        <i class="fa-solid fa-arrow-right-arrow-left text-darkBg text-base sm:text-lg font-black"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-1.5 sm:gap-2">
+                            <h1 class="text-lg sm:text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-binanceYellow bg-clip-text text-transparent">CâmbioBol <span class="text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full bg-binanceYellow/20 text-binanceYellow border border-binanceYellow/30 font-semibold uppercase">PRO</span></h1>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                                Ao Vivo
+                            </span>
+                        </div>
+                        <p class="text-[10px] sm:text-xs text-slate-400 font-medium">BRL ➔ USDT (Spot) ➔ BOB (P2P)</p>
+                    </div>
                 </div>
-                <p class="text-xs text-slate-400 font-medium">BRL (PIX) ➔ USDT (Binance Spot) ➔ BOB (Binance P2P)</p>
-            </div>
-        </div>
 
-        <!-- Live Controls, PWA Install & Interval Selector -->
-        <div class="flex items-center gap-2.5 flex-wrap">
-            <!-- Seletor de Intervalo de Atualização (15s, 30s, 60s) -->
-            <div class="flex items-center gap-1.5 bg-darkBg/80 border border-cardBorder px-2.5 py-1.5 rounded-lg text-xs text-slate-300">
-                <i class="fa-solid fa-clock-rotate-left text-binanceYellow"></i>
-                <select id="refreshIntervalSelect" class="bg-transparent text-white font-bold focus:outline-none cursor-pointer">
-                    <option value="15" selected class="bg-cardBg text-white">⏱️ 15 segundos</option>
-                    <option value="30" class="bg-cardBg text-white">⏱️ 30 segundos</option>
-                    <option value="60" class="bg-cardBg text-white">⏱️ 60 segundos</option>
-                    <option value="0" class="bg-cardBg text-white">⏸️ Manual</option>
-                </select>
-                <span id="countdownTimer" class="font-mono font-bold text-binanceYellow text-xs pl-1 border-l border-cardBorder">15s</span>
+                <!-- Botão PWA no Mobile (lado direito do header) -->
+                <button id="installPwaBtn" class="hidden sm:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-xs font-bold transition-all border border-emerald-500/30">
+                    <i class="fa-solid fa-download text-[11px]"></i>
+                    <span>Instalar</span>
+                </button>
             </div>
 
-            <!-- Botão Instalar App no Celular -->
-            <button id="installPwaBtn" class="hidden flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-xs font-bold transition-all border border-emerald-500/30">
-                <i class="fa-solid fa-mobile-screen-button"></i>
-                <span>Instalar App</span>
-            </button>
+            <!-- Toolbar de Controles (Sempre Visível e Alinhada no Mobile) -->
+            <div class="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-cardBorder/50">
+                <!-- Seletor de Intervalo + Contador -->
+                <div class="flex items-center gap-1.5 bg-darkBg border border-cardBorder px-2.5 py-1.5 rounded-lg text-xs text-slate-300 flex-1 sm:flex-none justify-between sm:justify-start">
+                    <div class="flex items-center gap-1">
+                        <i class="fa-solid fa-clock-rotate-left text-binanceYellow text-[11px]"></i>
+                        <select id="refreshIntervalSelect" class="bg-transparent text-white font-bold focus:outline-none cursor-pointer text-xs">
+                            <option value="15" selected class="bg-cardBg text-white">15s</option>
+                            <option value="30" class="bg-cardBg text-white">30s</option>
+                            <option value="60" class="bg-cardBg text-white">60s</option>
+                            <option value="0" class="bg-cardBg text-white">Manual</option>
+                        </select>
+                    </div>
+                    <span id="countdownTimer" class="font-mono font-bold text-binanceYellow text-xs pl-2 border-l border-cardBorder">15s</span>
+                </div>
 
-            <!-- Botão Atualizar Agora -->
-            <button id="refreshBtn" class="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-cardBorder hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all active:scale-95 border border-slate-700 shadow-sm">
-                <i id="refreshIcon" class="fa-solid fa-rotate"></i>
-                <span class="hidden sm:inline">Atualizar</span>
-            </button>
+                <!-- Botão PWA no Desktop -->
+                <button id="installPwaBtnDesktop" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-xs font-bold transition-all border border-emerald-500/30">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    <span>Instalar App</span>
+                </button>
+
+                <!-- Botão Atualizar Agora -->
+                <button id="refreshBtn" class="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cardBorder hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all active:scale-95 border border-slate-700 shadow-sm flex-shrink-0">
+                    <i id="refreshIcon" class="fa-solid fa-rotate text-[11px]"></i>
+                    <span>Atualizar</span>
+                </button>
+            </div>
+
         </div>
     </header>
 
     <!-- Main Container -->
-    <main class="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
+    <main class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
 
-        <!-- Real-Time Metrics Banner -->
-        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Real-Time Metrics Banner (2 Colunas no Mobile / 4 no Desktop) -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
             
             <!-- Card 1: Spot USDT/BRL -->
-            <div class="kpi-card bg-cardBg border border-cardBorder rounded-2xl p-5 hover:border-blue-500/40 shadow-lg shadow-black/20 relative overflow-hidden flex flex-col justify-between min-h-[145px]">
+            <div class="kpi-card bg-cardBg border border-cardBorder rounded-2xl p-3.5 sm:p-5 hover:border-blue-500/40 shadow-lg shadow-black/20 relative overflow-hidden flex flex-col justify-between min-h-[125px] sm:min-h-[145px]">
                 <div>
-                    <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-                        <span class="flex items-center gap-1.5 text-slate-300"><i class="fa-solid fa-coins text-blue-400"></i> Binance Spot</span>
-                        <span class="text-[10px] uppercase tracking-wider bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md font-bold border border-blue-500/20">BRL ➔ USDT</span>
+                    <div class="flex items-center justify-between text-slate-400 text-[11px] sm:text-xs font-semibold mb-1 sm:mb-2">
+                        <span class="flex items-center gap-1 text-slate-300 truncate"><i class="fa-solid fa-coins text-blue-400"></i> Spot Compra</span>
+                        <span class="text-[9px] sm:text-[10px] uppercase tracking-wider bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded font-bold border border-blue-500/20">BRL/USDT</span>
                     </div>
-                    <div class="flex items-baseline gap-1.5 mt-1">
-                        <span class="text-xs text-slate-400 font-bold">R$</span>
-                        <span id="kpiSpotUsdtBrl" class="text-2xl lg:text-3xl font-black font-mono tracking-tight text-white">--</span>
+                    <div class="flex items-baseline gap-1 mt-0.5 sm:mt-1">
+                        <span class="text-[11px] sm:text-xs text-slate-400 font-bold">R$</span>
+                        <span id="kpiSpotUsdtBrl" class="text-lg sm:text-2xl lg:text-3xl font-black font-mono tracking-tight text-white">--</span>
                     </div>
                 </div>
-                <div class="text-[11px] text-slate-400 pt-3 border-t border-cardBorder/40 flex items-center justify-between mt-2">
-                    <span>Spread: <span id="kpiSpotSpread" class="text-slate-300 font-mono">--</span></span>
-                    <span class="text-blue-400 font-medium">Taxa 0.075%</span>
+                <div class="text-[10px] sm:text-[11px] text-slate-400 pt-2 sm:pt-3 border-t border-cardBorder/40 flex items-center justify-between mt-1 sm:mt-2">
+                    <span class="truncate">Spread: <span id="kpiSpotSpread" class="text-slate-300 font-mono">--</span></span>
+                    <span class="text-blue-400 font-medium text-[9px] sm:text-[10px]">0.075%</span>
                 </div>
             </div>
 
             <!-- Card 2: P2P USDT/BOB -->
-            <div class="kpi-card bg-cardBg border border-cardBorder rounded-2xl p-5 hover:border-yellow-500/40 shadow-lg shadow-black/20 relative overflow-hidden flex flex-col justify-between min-h-[145px]">
+            <div class="kpi-card bg-cardBg border border-cardBorder rounded-2xl p-3.5 sm:p-5 hover:border-yellow-500/40 shadow-lg shadow-black/20 relative overflow-hidden flex flex-col justify-between min-h-[125px] sm:min-h-[145px]">
                 <div>
-                    <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-                        <span class="flex items-center gap-1.5 text-slate-300"><i class="fa-solid fa-users-viewfinder text-binanceYellow"></i> Binance P2P</span>
-                        <span class="text-[10px] uppercase tracking-wider bg-yellow-500/10 text-binanceYellow px-2 py-0.5 rounded-md font-bold border border-yellow-500/20">USDT ➔ BOB</span>
+                    <div class="flex items-center justify-between text-slate-400 text-[11px] sm:text-xs font-semibold mb-1 sm:mb-2">
+                        <span class="flex items-center gap-1 text-slate-300 truncate"><i class="fa-solid fa-users-viewfinder text-binanceYellow"></i> P2P Venda</span>
+                        <span class="text-[9px] sm:text-[10px] uppercase tracking-wider bg-yellow-500/10 text-binanceYellow px-1.5 py-0.5 rounded font-bold border border-yellow-500/20">USDT/BOB</span>
                     </div>
-                    <div class="flex items-baseline gap-1.5 mt-1">
-                        <span class="text-xs text-slate-400 font-bold">Bs.</span>
-                        <span id="kpiP2pUsdtBob" class="text-2xl lg:text-3xl font-black font-mono tracking-tight text-binanceYellow">--</span>
+                    <div class="flex items-baseline gap-1 mt-0.5 sm:mt-1">
+                        <span class="text-[11px] sm:text-xs text-slate-400 font-bold">Bs.</span>
+                        <span id="kpiP2pUsdtBob" class="text-lg sm:text-2xl lg:text-3xl font-black font-mono tracking-tight text-binanceYellow">--</span>
                     </div>
                 </div>
-                <div class="text-[11px] text-slate-400 pt-3 border-t border-cardBorder/40 flex items-center justify-between mt-2">
-                    <span>Top 3: <span id="kpiP2pTop3" class="text-slate-300 font-mono">--</span> Bs.</span>
-                    <span class="text-emerald-400 font-medium flex items-center gap-1"><i class="fa-solid fa-circle-check text-[10px]"></i> Verificados</span>
+                <div class="text-[10px] sm:text-[11px] text-slate-400 pt-2 sm:pt-3 border-t border-cardBorder/40 flex items-center justify-between mt-1 sm:mt-2">
+                    <span class="truncate">Top 3: <span id="kpiP2pTop3" class="text-slate-300 font-mono">--</span></span>
+                    <span class="text-emerald-400 font-medium text-[9px] sm:text-[10px] flex items-center gap-0.5"><i class="fa-solid fa-circle-check"></i> Verif.</span>
                 </div>
             </div>
 
             <!-- Card 3: Câmbio Bruto Efetivo (Custo Real) -->
-            <div class="kpi-card bg-cardBg border border-cardBorder rounded-2xl p-5 hover:border-purple-500/40 shadow-lg shadow-black/20 relative overflow-hidden flex flex-col justify-between min-h-[145px]">
+            <div class="kpi-card bg-cardBg border border-cardBorder rounded-2xl p-3.5 sm:p-5 hover:border-purple-500/40 shadow-lg shadow-black/20 relative overflow-hidden flex flex-col justify-between min-h-[125px] sm:min-h-[145px]">
                 <div>
-                    <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-                        <span class="flex items-center gap-1.5 text-slate-300"><i class="fa-solid fa-chart-line text-purple-400"></i> Câmbio Bruto</span>
-                        <span class="text-[10px] uppercase tracking-wider bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded-md font-bold border border-purple-500/20">CUSTO PURO</span>
+                    <div class="flex items-center justify-between text-slate-400 text-[11px] sm:text-xs font-semibold mb-1 sm:mb-2">
+                        <span class="flex items-center gap-1 text-slate-300 truncate"><i class="fa-solid fa-chart-line text-purple-400"></i> Câmbio Bruto</span>
+                        <span class="text-[9px] sm:text-[10px] uppercase tracking-wider bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded font-bold border border-purple-500/20">CUSTO</span>
                     </div>
-                    <div class="flex items-baseline gap-1.5 mt-1">
-                        <span class="text-xs text-slate-400 font-bold">Bs.</span>
-                        <span id="kpiRawRate" class="text-2xl lg:text-3xl font-black font-mono tracking-tight text-white">--</span>
+                    <div class="flex items-baseline gap-1 mt-0.5 sm:mt-1">
+                        <span class="text-[11px] sm:text-xs text-slate-400 font-bold">Bs.</span>
+                        <span id="kpiRawRate" class="text-lg sm:text-2xl lg:text-3xl font-black font-mono tracking-tight text-white">--</span>
                     </div>
                 </div>
-                <div class="text-[11px] text-slate-400 pt-3 border-t border-cardBorder/40 flex items-center justify-between mt-2">
-                    <span>1 BOB custa: <span id="kpiRawRateInverse" class="text-slate-300 font-mono">--</span></span>
-                    <span class="text-purple-400 font-medium">Sem Margem</span>
+                <div class="text-[10px] sm:text-[11px] text-slate-400 pt-2 sm:pt-3 border-t border-cardBorder/40 flex items-center justify-between mt-1 sm:mt-2">
+                    <span class="truncate">1 BOB: <span id="kpiRawRateInverse" class="text-slate-300 font-mono">--</span></span>
+                    <span class="text-purple-400 font-medium text-[9px] sm:text-[10px]">Puro</span>
                 </div>
             </div>
 
             <!-- Card 4: Câmbio Comercial (Com Lucro) -->
-            <div class="kpi-card bg-cardBg border border-emerald-500/30 rounded-2xl p-5 hover:border-emerald-500/60 shadow-lg shadow-black/20 relative overflow-hidden flex flex-col justify-between min-h-[145px] bg-gradient-to-br from-cardBg via-cardBg to-emerald-950/30">
+            <div class="kpi-card bg-cardBg border border-emerald-500/30 rounded-2xl p-3.5 sm:p-5 hover:border-emerald-500/60 shadow-lg shadow-black/20 relative overflow-hidden flex flex-col justify-between min-h-[125px] sm:min-h-[145px] bg-gradient-to-br from-cardBg via-cardBg to-emerald-950/30">
                 <div>
-                    <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-                        <span class="flex items-center gap-1.5 text-slate-200"><i class="fa-solid fa-hand-holding-dollar text-emerald-400"></i> Câmbio ao Cliente</span>
-                        <span id="kpiMarginBadge" class="text-[10px] uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-bold border border-emerald-500/30">LUCRO: 1.0%</span>
+                    <div class="flex items-center justify-between text-slate-400 text-[11px] sm:text-xs font-semibold mb-1 sm:mb-2">
+                        <span class="flex items-center gap-1 text-slate-200 truncate"><i class="fa-solid fa-hand-holding-dollar text-emerald-400"></i> Comercial</span>
+                        <span id="kpiMarginBadge" class="text-[9px] sm:text-[10px] uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-500/30 truncate">LUCRO: 1%</span>
                     </div>
-                    <div class="flex items-baseline gap-1.5 mt-1">
-                        <span class="text-xs text-slate-400 font-bold">Bs.</span>
-                        <span id="kpiCommercialRate" class="text-2xl lg:text-3xl font-black font-mono tracking-tight text-emerald-400">--</span>
+                    <div class="flex items-baseline gap-1 mt-0.5 sm:mt-1">
+                        <span class="text-[11px] sm:text-xs text-slate-400 font-bold">Bs.</span>
+                        <span id="kpiCommercialRate" class="text-lg sm:text-2xl lg:text-3xl font-black font-mono tracking-tight text-emerald-400">--</span>
                     </div>
                 </div>
-                <div class="text-[11px] text-slate-400 pt-3 border-t border-cardBorder/40 flex items-center justify-between mt-2">
-                    <span>Cobrar por BOB: <span id="kpiCommercialInverse" class="text-slate-200 font-mono font-semibold">--</span></span>
-                    <span class="text-emerald-400 font-bold">Taxa Final</span>
+                <div class="text-[10px] sm:text-[11px] text-slate-400 pt-2 sm:pt-3 border-t border-cardBorder/40 flex items-center justify-between mt-1 sm:mt-2">
+                    <span class="truncate">Por BOB: <span id="kpiCommercialInverse" class="text-slate-200 font-mono font-semibold">--</span></span>
+                    <span class="text-emerald-400 font-bold text-[9px] sm:text-[10px]">Final</span>
                 </div>
             </div>
 
         </section>
 
         <!-- Main Content Area: 2 Columns Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
             
             <!-- LEFT COLUMN: Calculator & Simulator (7 cols) -->
-            <section class="lg:col-span-7 space-y-6">
+            <section class="lg:col-span-7 space-y-4 sm:space-y-6">
                 
                 <!-- Calculator Card -->
-                <div class="bg-cardBg border border-cardBorder rounded-3xl p-5 lg:p-7 shadow-xl">
-                    <div class="flex flex-wrap items-center justify-between gap-3 pb-4 mb-5 border-b border-cardBorder">
-                        <div class="flex items-center gap-2.5">
-                            <i class="fa-solid fa-calculator text-binanceYellow text-lg"></i>
-                            <h2 class="text-lg font-bold text-white tracking-tight">Calculadora de Câmbio & Remessa</h2>
+                <div class="bg-cardBg border border-cardBorder rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-7 shadow-xl">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 sm:pb-4 mb-4 sm:mb-5 border-b border-cardBorder">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-calculator text-binanceYellow text-base sm:text-lg"></i>
+                            <h2 class="text-base sm:text-lg font-bold text-white tracking-tight">Calculadora de Câmbio & Remessa</h2>
                         </div>
                         
-                        <!-- Mode Switch Tabs com títulos claros -->
-                        <div class="inline-flex p-1 bg-darkBg border border-cardBorder rounded-xl text-xs font-semibold">
-                            <button id="tabBrlToBob" class="tab-btn px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow-md transition-all flex items-center gap-1.5">
+                        <!-- Mode Switch Tabs -->
+                        <div class="grid grid-cols-2 p-1 bg-darkBg border border-cardBorder rounded-xl text-xs font-semibold w-full sm:w-auto">
+                            <button id="tabBrlToBob" class="tab-btn py-2 px-3 rounded-lg bg-blue-600 text-white shadow-md transition-all flex items-center justify-center gap-1.5">
                                 <span class="font-bold">BRL ➔ BOB</span>
                                 <span class="text-[10px] text-blue-200 hidden sm:inline">(Envio R$)</span>
                             </button>
-                            <button id="tabBobToBrl" class="tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+                            <button id="tabBobToBrl" class="tab-btn py-2 px-3 rounded-lg text-slate-400 hover:text-white transition-all flex items-center justify-center gap-1.5">
                                 <span class="font-bold">BOB ➔ BRL</span>
                                 <span class="text-[10px] text-slate-400 hidden sm:inline">(Meta Bs.)</span>
                             </button>
@@ -196,12 +211,12 @@
                     </div>
 
                     <!-- Input Form -->
-                    <div class="space-y-5">
+                    <div class="space-y-4 sm:space-y-5">
                         
                         <!-- Main Amount Input -->
                         <div>
-                            <div class="flex items-center justify-between mb-2">
-                                <label id="inputAmountLabel" for="inputAmount" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                            <div class="flex items-center justify-between mb-1.5 sm:mb-2">
+                                <label id="inputAmountLabel" for="inputAmount" class="block text-[11px] sm:text-xs font-semibold text-slate-300 uppercase tracking-wider">
                                     Valor a receber no PIX (Reais - BRL)
                                 </label>
                                 <span id="modeDescriptionBadge" class="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded font-semibold">
@@ -210,23 +225,23 @@
                             </div>
                             
                             <div class="relative rounded-2xl bg-darkBg border-2 border-slate-700 focus-within:border-binanceYellow transition-all shadow-inner flex items-center">
-                                <div class="pl-4 pr-1 text-slate-400 font-bold text-lg select-none" id="inputCurrencySymbol">
+                                <div class="pl-3.5 pr-1 text-slate-400 font-bold text-base sm:text-lg select-none" id="inputCurrencySymbol">
                                     R$
                                 </div>
-                                <input type="number" id="inputAmount" value="1000" min="1" step="any" class="w-full bg-transparent pl-2 pr-44 py-3.5 text-2xl lg:text-3xl font-black font-mono text-white focus:outline-none placeholder-slate-600" placeholder="0.00">
+                                <input type="number" id="inputAmount" value="1000" min="1" step="any" class="w-full bg-transparent pl-2 pr-36 sm:pr-44 py-3 sm:py-3.5 text-xl sm:text-3xl font-black font-mono text-white focus:outline-none placeholder-slate-600" placeholder="0.00">
                                 
                                 <!-- Botões Rápidos de Valor -->
-                                <div class="absolute right-2.5 flex items-center gap-1.5" id="quickAmountButtonsContainer">
-                                    <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="500">500</button>
-                                    <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="1000">1K</button>
-                                    <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="2000">2K</button>
-                                    <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="5000">5K</button>
+                                <div class="absolute right-2 flex items-center gap-1" id="quickAmountButtonsContainer">
+                                    <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="500">500</button>
+                                    <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="1000">1K</button>
+                                    <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="2000">2K</button>
+                                    <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="5000">5K</button>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Profit Margin Selector com novas opções (0.5%, 0.75%, 1%, etc.) -->
-                        <div class="bg-darkBg/70 border border-cardBorder rounded-2xl p-4 space-y-3">
+                        <!-- Profit Margin Selector com novos presets -->
+                        <div class="bg-darkBg/70 border border-cardBorder rounded-2xl p-3.5 sm:p-4 space-y-2.5 sm:space-y-3">
                             <div class="flex items-center justify-between flex-wrap gap-2">
                                 <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                                     <i class="fa-solid fa-percent text-emerald-400"></i>
@@ -241,20 +256,20 @@
                                 </div>
                             </div>
 
-                            <!-- Margin Presets Rápidos -->
-                            <div class="flex flex-wrap items-center gap-1.5 pt-1" id="marginPresetsContainer">
-                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="0.5">0.5%</button>
-                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="0.75">0.75%</button>
-                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95" data-val="1.0">1.0%</button>
-                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="1.5">1.5%</button>
-                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="2.0">2.0%</button>
-                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="2.5">2.5%</button>
-                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="3.0">3.0%</button>
-                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="4.0">4.0%</button>
-                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="5.0">5.0%</button>
+                            <!-- Margin Presets Rápidos com quebra suave -->
+                            <div class="flex flex-wrap items-center gap-1 sm:gap-1.5 pt-1" id="marginPresetsContainer">
+                                <button type="button" class="margin-btn px-2 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-[11px] sm:text-xs font-bold hover:bg-slate-700 transition-all active:scale-95 flex-1 sm:flex-none text-center" data-val="0.5">0.5%</button>
+                                <button type="button" class="margin-btn px-2 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-[11px] sm:text-xs font-bold hover:bg-slate-700 transition-all active:scale-95 flex-1 sm:flex-none text-center" data-val="0.75">0.75%</button>
+                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] sm:text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95 flex-1 sm:flex-none text-center" data-val="1.0">1.0%</button>
+                                <button type="button" class="margin-btn px-2 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-[11px] sm:text-xs font-bold hover:bg-slate-700 transition-all active:scale-95 flex-1 sm:flex-none text-center" data-val="1.5">1.5%</button>
+                                <button type="button" class="margin-btn px-2 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-[11px] sm:text-xs font-bold hover:bg-slate-700 transition-all active:scale-95 flex-1 sm:flex-none text-center" data-val="2.0">2.0%</button>
+                                <button type="button" class="margin-btn px-2 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-[11px] sm:text-xs font-bold hover:bg-slate-700 transition-all active:scale-95 flex-1 sm:flex-none text-center" data-val="2.5">2.5%</button>
+                                <button type="button" class="margin-btn px-2 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-[11px] sm:text-xs font-bold hover:bg-slate-700 transition-all active:scale-95 flex-1 sm:flex-none text-center" data-val="3.0">3.0%</button>
+                                <button type="button" class="margin-btn px-2 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-[11px] sm:text-xs font-bold hover:bg-slate-700 transition-all active:scale-95 flex-1 sm:flex-none text-center" data-val="4.0">4.0%</button>
+                                <button type="button" class="margin-btn px-2 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-[11px] sm:text-xs font-bold hover:bg-slate-700 transition-all active:scale-95 flex-1 sm:flex-none text-center" data-val="5.0">5.0%</button>
                                 
-                                <div class="flex items-center gap-1 ml-auto bg-cardBg border border-cardBorder rounded-lg px-2.5 py-1">
-                                    <input type="number" id="customMarginInput" value="1.0" step="0.05" min="0" class="w-14 bg-transparent text-right font-mono font-bold text-white text-xs focus:outline-none">
+                                <div class="flex items-center gap-1 w-full sm:w-auto sm:ml-auto bg-cardBg border border-cardBorder rounded-lg px-2.5 py-1 justify-center">
+                                    <input type="number" id="customMarginInput" value="1.0" step="0.05" min="0" class="w-16 bg-transparent text-right font-mono font-bold text-white text-xs focus:outline-none">
                                     <span id="marginUnitLabel" class="text-xs text-slate-400 font-bold">%</span>
                                 </div>
                             </div>
@@ -262,11 +277,11 @@
 
                         <!-- Advanced Options Accordion -->
                         <details class="group bg-darkBg/40 border border-cardBorder rounded-xl overflow-hidden">
-                            <summary class="flex items-center justify-between px-4 py-2.5 cursor-pointer text-xs font-semibold text-slate-400 hover:text-slate-200 select-none">
+                            <summary class="flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-xs font-semibold text-slate-400 hover:text-slate-200 select-none">
                                 <span class="flex items-center gap-2"><i class="fa-solid fa-sliders text-blue-400"></i> Opções Avançadas de Cotação</span>
                                 <i class="fa-solid fa-chevron-down text-[10px] group-open:rotate-180 transition-transform"></i>
                             </summary>
-                            <div class="p-4 pt-2 border-t border-cardBorder/50 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                            <div class="p-3.5 pt-2 border-t border-cardBorder/50 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                                 <div>
                                     <label class="block text-slate-400 mb-1">Preço P2P USDT/BOB Customizado:</label>
                                     <input type="number" id="customP2pPrice" step="0.01" class="w-full bg-cardBg border border-cardBorder rounded-lg px-3 py-2 font-mono text-white text-xs focus:border-binanceYellow" placeholder="Auto (Melhor Oferta)">
@@ -279,49 +294,49 @@
                         </details>
 
                         <!-- Operation Breakdown & Result Box -->
-                        <div class="bg-gradient-to-b from-darkBg to-slate-950 border-2 border-emerald-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
+                        <div class="bg-gradient-to-b from-darkBg to-slate-950 border-2 border-emerald-500/30 rounded-2xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 shadow-xl">
                             
                             <div class="flex items-center justify-between border-b border-cardBorder pb-3 flex-wrap gap-2">
                                 <div>
-                                    <span id="resClientHeaderLabel" class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Valor a Entregar ao Cliente na Bolívia</span>
-                                    <div class="flex items-baseline gap-2 mt-1">
+                                    <span id="resClientHeaderLabel" class="text-[11px] sm:text-xs uppercase tracking-wider text-slate-400 font-semibold">Valor a Entregar ao Cliente na Bolívia</span>
+                                    <div class="flex items-baseline gap-1.5 mt-0.5 sm:mt-1">
                                         <span id="resClientPrefix" class="text-emerald-400 font-black text-xs">BOB</span>
-                                        <span id="resClientReceivesBob" class="text-3xl lg:text-4xl font-black font-mono text-emerald-400 tracking-tight">0.00</span>
+                                        <span id="resClientReceivesBob" class="text-2xl sm:text-3xl lg:text-4xl font-black font-mono text-emerald-400 tracking-tight">0.00</span>
                                         <span id="resClientSuffix" class="text-xs text-slate-400">Bs.</span>
                                     </div>
                                 </div>
                                 <div class="text-right">
-                                    <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Seu Lucro Líquido</span>
-                                    <div class="flex items-baseline justify-end gap-1.5 mt-1">
+                                    <span class="text-[11px] sm:text-xs uppercase tracking-wider text-slate-400 font-semibold">Seu Lucro Líquido</span>
+                                    <div class="flex items-baseline justify-end gap-1 mt-0.5 sm:mt-1">
                                         <span class="text-xs text-emerald-400 font-bold">+</span>
-                                        <span id="resOperatorProfitBrl" class="text-xl lg:text-2xl font-black font-mono text-white">R$ 0,00</span>
+                                        <span id="resOperatorProfitBrl" class="text-lg sm:text-xl lg:text-2xl font-black font-mono text-white">R$ 0,00</span>
                                     </div>
                                     <span id="resProfitPercentBadge" class="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">(+0.0%)</span>
                                 </div>
                             </div>
 
-                            <!-- Execution Flow Breakdown -->
-                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
-                                <div class="bg-cardBg/60 border border-cardBorder p-3 rounded-xl">
-                                    <span id="step1Label" class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">1. PIX Recebido</span>
-                                    <span id="resStepPix" class="font-mono font-bold text-slate-200">R$ 1.000,00</span>
+                            <!-- Execution Flow Breakdown (2x2 no mobile) -->
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                                <div class="bg-cardBg/60 border border-cardBorder p-2.5 sm:p-3 rounded-xl">
+                                    <span id="step1Label" class="text-[9px] sm:text-[10px] text-slate-400 uppercase font-semibold block mb-0.5 truncate">1. PIX Recebido</span>
+                                    <span id="resStepPix" class="font-mono font-bold text-slate-200 text-xs sm:text-sm">R$ 1.000,00</span>
                                 </div>
-                                <div class="bg-cardBg/60 border border-cardBorder p-3 rounded-xl">
-                                    <span id="step2Label" class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">2. USDT Comprado</span>
-                                    <span id="resStepUsdt" class="font-mono font-bold text-blue-400">0.00 USDT</span>
+                                <div class="bg-cardBg/60 border border-cardBorder p-2.5 sm:p-3 rounded-xl">
+                                    <span id="step2Label" class="text-[9px] sm:text-[10px] text-slate-400 uppercase font-semibold block mb-0.5 truncate">2. USDT Comprado</span>
+                                    <span id="resStepUsdt" class="font-mono font-bold text-blue-400 text-xs sm:text-sm">0.00 USDT</span>
                                 </div>
-                                <div class="bg-cardBg/60 border border-cardBorder p-3 rounded-xl">
-                                    <span id="step3Label" class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">3. Câmbio Fechado</span>
-                                    <span id="resStepRate" class="font-mono font-bold text-binanceYellow">1 = -- Bs.</span>
+                                <div class="bg-cardBg/60 border border-cardBorder p-2.5 sm:p-3 rounded-xl">
+                                    <span id="step3Label" class="text-[9px] sm:text-[10px] text-slate-400 uppercase font-semibold block mb-0.5 truncate">3. Câmbio Fechado</span>
+                                    <span id="resStepRate" class="font-mono font-bold text-binanceYellow text-xs sm:text-sm">1 = -- Bs.</span>
                                 </div>
-                                <div class="bg-cardBg/60 border border-cardBorder p-3 rounded-xl">
-                                    <span id="step4Label" class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">4. Custo p/ BOB</span>
-                                    <span id="resStepInverse" class="font-mono font-bold text-purple-400">R$ --</span>
+                                <div class="bg-cardBg/60 border border-cardBorder p-2.5 sm:p-3 rounded-xl">
+                                    <span id="step4Label" class="text-[9px] sm:text-[10px] text-slate-400 uppercase font-semibold block mb-0.5 truncate">4. Custo p/ BOB</span>
+                                    <span id="resStepInverse" class="font-mono font-bold text-purple-400 text-xs sm:text-sm">R$ --</span>
                                 </div>
                             </div>
 
                             <!-- WhatsApp Action Buttons -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-1">
                                 <button id="copyWhatsappBtn" class="flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs tracking-wide transition-all shadow-lg shadow-emerald-600/20 active:scale-98">
                                     <i class="fa-solid fa-copy text-sm"></i>
                                     <span>Copiar Proposta WhatsApp</span>
@@ -340,24 +355,24 @@
             </section>
 
             <!-- RIGHT COLUMN: Live P2P Order Book & 1h/24h Chart (5 cols) -->
-            <section class="lg:col-span-5 space-y-6">
+            <section class="lg:col-span-5 space-y-4 sm:space-y-6">
                 
                 <!-- Live P2P Order Book Table (Apenas Verificados) -->
-                <div class="bg-cardBg border border-cardBorder rounded-3xl p-5 shadow-xl">
-                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-cardBorder">
+                <div class="bg-cardBg border border-cardBorder rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xl">
+                    <div class="flex items-center justify-between pb-2.5 sm:pb-3 mb-2.5 sm:mb-3 border-b border-cardBorder">
                         <div class="flex items-center gap-2">
                             <i class="fa-solid fa-shield-halved text-emerald-400 text-base"></i>
-                            <h3 class="text-sm font-bold text-white">Melhores Ofertas P2P</h3>
+                            <h3 class="text-xs sm:text-sm font-bold text-white">Melhores Ofertas P2P</h3>
                         </div>
-                        <span class="text-[10px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                            <i class="fa-solid fa-circle-check text-[10px]"></i> Apenas Verificados
+                        <span class="text-[9px] sm:text-[10px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-circle-check text-[9px]"></i> Verificados
                         </span>
                     </div>
 
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs">
                             <thead>
-                                <tr class="text-slate-400 border-b border-cardBorder/60 text-[10px] uppercase font-semibold">
+                                <tr class="text-slate-400 border-b border-cardBorder/60 text-[9px] sm:text-[10px] uppercase font-semibold">
                                     <th class="pb-2">Comerciante</th>
                                     <th class="pb-2 text-right">Preço</th>
                                     <th class="pb-2 text-right">Limites (Bs.)</th>
@@ -367,39 +382,39 @@
                             <tbody id="p2pTableBody" class="divide-y divide-cardBorder/40">
                                 <tr>
                                     <td colspan="4" class="py-6 text-center text-slate-500">
-                                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Carregando ofertas P2P verificadas...
+                                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Carregando ofertas P2P...
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    <p class="text-[10px] text-slate-500 mt-3 italic">*Clique em "Usar" para aplicar a cotação de qualquer comerciante na calculadora.</p>
+                    <p class="text-[9px] sm:text-[10px] text-slate-500 mt-2.5 italic">*Clique em "Usar" para aplicar a cotação de qualquer comerciante.</p>
                 </div>
 
                 <!-- Rate History & Intraday Chart com abas de 1 Hora e 24 Horas -->
-                <div class="bg-cardBg border border-cardBorder rounded-3xl p-5 shadow-xl space-y-3">
+                <div class="bg-cardBg border border-cardBorder rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xl space-y-3">
                     <div class="flex items-center justify-between pb-2 border-b border-cardBorder flex-wrap gap-2">
                         <div class="flex items-center gap-2">
                             <i class="fa-solid fa-wave-square text-blue-400 text-sm"></i>
-                            <h3 class="text-sm font-bold text-white">Oscilação do Câmbio BRL/BOB</h3>
+                            <h3 class="text-xs sm:text-sm font-bold text-white">Oscilação do Câmbio BRL/BOB</h3>
                         </div>
                         
                         <!-- Seletor 1h vs 24h -->
                         <div class="inline-flex p-1 bg-darkBg border border-cardBorder rounded-lg text-xs font-semibold">
-                            <button id="btnTimeframe1h" class="timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[11px]">
+                            <button id="btnTimeframe1h" class="timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[10px] sm:text-[11px]">
                                 1 Hora
                             </button>
-                            <button id="btnTimeframe24h" class="timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[11px]">
+                            <button id="btnTimeframe24h" class="timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[10px] sm:text-[11px]">
                                 24 Horas
                             </button>
                         </div>
                     </div>
                     
-                    <div class="h-48 w-full">
+                    <div class="h-60 sm:h-52 w-full relative">
                         <canvas id="rateHistoryChart"></canvas>
                     </div>
-                    <p class="text-[10px] text-slate-400 text-right font-mono" id="chartSubtitle">
-                        *Passe o cursor sobre os pontos para ver o câmbio exato por hora.
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 text-right font-mono" id="chartSubtitle">
+                        *Toque ou deslize sobre os pontos para ver o câmbio exato por hora.
                     </p>
                 </div>
 
