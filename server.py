@@ -1,5 +1,6 @@
 import time
 import threading
+import datetime
 import requests
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -7,20 +8,18 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
 
-# Cache de cotacoes em memoria
+# Cache de cotações em memória
 quotes_cache = {
     "last_updated": time.time(),
     "spot_usdt_brl": {"bid": 5.21, "ask": 5.213, "symbol": "USDTBRL"},
     "p2p_usdt_bob": [],
-    "p2p_usdt_brl": [],
     "best_p2p_bob": 12.10,
     "top3_avg_bob": 12.08,
     "rate_brl_bob_raw": 2.32,
     "rate_bob_brl_raw": 0.43,
-    "history": []
+    "history_1h": [],
+    "history_24h": []
 }
-
-HISTORY_MAX_ITEMS = 60
 
 HEADERS_SPOT = {
     'Accept': 'application/json',
@@ -49,7 +48,7 @@ BINANCE_SPOT_ENDPOINTS = [
 ]
 
 def fetch_binance_spot_usdt_brl():
-    """Busca o preco Spot USDT/BRL com multiplos fallbacks."""
+    """Busca o preço Spot USDT/BRL com múltiplos fallbacks."""
     for url in BINANCE_SPOT_ENDPOINTS:
         try:
             resp = requests.get(url, headers=HEADERS_SPOT, timeout=4)
@@ -73,17 +72,20 @@ def clean_str(val):
         return "Comerciante"
     return str(val).encode('utf-8', 'ignore').decode('utf-8')
 
-def fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=12):
-    """Busca anuncios no P2P da Binance com headers web completos."""
+def fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=12, only_verified=True):
+    """
+    Busca anúncios no P2P da Binance.
+    only_verified=True: filtra apenas anunciantes verificados (PRO / Merchant).
+    """
     try:
         url = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
         payload = {
             "asset": asset,
             "fiat": fiat,
-            "merchantCheck": False,
+            "merchantCheck": True if only_verified else False,
             "page": 1,
             "payTypes": [],
-            "publisherType": None,
+            "publisherType": "merchant" if only_verified else None,
             "rows": rows,
             "tradeType": trade_type
         }
@@ -100,6 +102,8 @@ def fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=12):
                     ads_list.append({
                         "adv_id": clean_str(adv.get("advNo")),
                         "nick_name": clean_str(advertiser.get("nickName", "Comerciante")),
+                        "user_type": clean_str(advertiser.get("userType", "merchant")),
+                        "is_verified": True,
                         "month_order_count": int(advertiser.get("monthOrderCount", 0)),
                         "month_finish_rate": round(float(advertiser.get("monthFinishRate", 0) * 100), 1),
                         "price": price,
@@ -108,17 +112,34 @@ def fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=12):
                         "surplus_amount": float(adv.get("surplusAmount", 0)),
                         "trade_methods": methods
                     })
-            return ads_list
+            if len(ads_list) > 0:
+                return ads_list
+                
+        # Se com filtro de merchant vier vazio, busca geral como fallback
+        if only_verified:
+            return fetch_binance_p2p(asset=asset, fiat=fiat, trade_type=trade_type, rows=rows, only_verified=False)
+            
     except Exception as e:
         print(f"Aviso P2P fetch: {e}")
     return []
 
+def fetch_binance_klines(symbol="USDTBRL", interval="1h", limit=24):
+    """Busca histórico real de Klines/Candles da Binance."""
+    try:
+        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+        resp = requests.get(url, headers=HEADERS_SPOT, timeout=4)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        print(f"Erro ao buscar Klines {interval}: {e}")
+    return []
+
 def update_all_quotes():
-    """Atualiza as cotacoes completas e mantem historico."""
+    """Atualiza as cotações completas, livro P2P e históricos 1h e 24h."""
     global quotes_cache
     try:
         spot = fetch_binance_spot_usdt_brl()
-        p2p_bob = fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=12)
+        p2p_bob = fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=12, only_verified=True)
         
         if spot:
             quotes_cache["spot_usdt_brl"] = spot
@@ -141,26 +162,51 @@ def update_all_quotes():
             quotes_cache["rate_brl_bob_raw"] = round(raw_bob_per_brl, 4)
             quotes_cache["rate_bob_brl_raw"] = round(raw_brl_per_bob, 4)
             
-            history_item = {
-                "timestamp": time.strftime("%H:%M:%S", time.localtime(now)),
-                "spot_usdt_brl": usdt_brl_buy_price,
-                "p2p_usdt_bob": best_p2p_bob,
-                "rate_brl_bob": round(raw_bob_per_brl, 4)
-            }
-            quotes_cache["history"].append(history_item)
-            if len(quotes_cache["history"]) > HISTORY_MAX_ITEMS:
-                quotes_cache["history"].pop(0)
+        # Atualiza histórico de 24 horas (24 pontos, 1 por hora)
+        klines_24h = fetch_binance_klines(symbol="USDTBRL", interval="1h", limit=24)
+        if klines_24h:
+            points_24h = []
+            for k in klines_24h:
+                t_str = datetime.datetime.fromtimestamp(k[0] / 1000).strftime('%H:00')
+                close_spot = float(k[4])
+                rate = round((1.0 / close_spot) * best_p2p_bob, 4) if close_spot > 0 else 0
+                points_24h.append({
+                    "timestamp": t_str,
+                    "spot_usdt_brl": round(close_spot, 4),
+                    "p2p_usdt_bob": round(best_p2p_bob, 2),
+                    "rate_brl_bob": rate,
+                    "full_time": datetime.datetime.fromtimestamp(k[0] / 1000).strftime('%d/%m %H:%M')
+                })
+            quotes_cache["history_24h"] = points_24h
+
+        # Atualiza histórico de 1 hora (60 pontos a cada 1 minuto)
+        klines_1h = fetch_binance_klines(symbol="USDTBRL", interval="1m", limit=60)
+        if klines_1h:
+            points_1h = []
+            for k in klines_1h:
+                t_str = datetime.datetime.fromtimestamp(k[0] / 1000).strftime('%H:%M')
+                close_spot = float(k[4])
+                rate = round((1.0 / close_spot) * best_p2p_bob, 4) if close_spot > 0 else 0
+                points_1h.append({
+                    "timestamp": t_str,
+                    "spot_usdt_brl": round(close_spot, 4),
+                    "p2p_usdt_bob": round(best_p2p_bob, 2),
+                    "rate_brl_bob": rate,
+                    "full_time": datetime.datetime.fromtimestamp(k[0] / 1000).strftime('%H:%M')
+                })
+            quotes_cache["history_1h"] = points_1h
+
     except Exception as e:
         print(f"Erro em update_all_quotes: {e}")
 
-# Thread de atualizacao em segundo plano
+# Thread de atualização em segundo plano (a cada 10 segundos para manter tudo fresco)
 def background_updater():
     while True:
         try:
             update_all_quotes()
         except Exception as e:
             print(f"Erro no background updater: {e}")
-        time.sleep(8)
+        time.sleep(10)
 
 updater_thread = threading.Thread(target=background_updater, daemon=True)
 updater_thread.start()
@@ -190,7 +236,8 @@ def get_quotes():
             "rate_bob_brl_raw": quotes_cache.get("rate_bob_brl_raw", 0.43),
             "p2p_ads_bob": quotes_cache.get("p2p_usdt_bob", []),
             "available_banks": sorted(list(all_methods)),
-            "history": quotes_cache.get("history", [])
+            "history_1h": quotes_cache.get("history_1h", []),
+            "history_24h": quotes_cache.get("history_24h", [])
         })
     except Exception as e:
         return jsonify({"error": str(e), "status": "error"}), 500
@@ -199,15 +246,15 @@ def get_quotes():
 def simulate():
     try:
         data = request.json or {}
-        mode = data.get("mode", "BRL_TO_BOB")
+        mode = data.get("mode", "BRL_TO_BOB") # 'BRL_TO_BOB' ou 'BOB_TO_BRL'
         amount = float(data.get("amount", 1000) or 1000)
-        profit_margin_type = data.get("profit_margin_type", "PERCENT")
-        profit_margin_value = float(data.get("profit_margin_value", 3.0) or 3.0)
+        profit_margin_type = data.get("profit_margin_type", "PERCENT") # 'PERCENT', 'FIXED_PER_BOB', 'FIXED_PER_TX'
+        profit_margin_value = float(data.get("profit_margin_value", 1.0) or 1.0)
         spot_fee_percent = float(data.get("spot_fee_percent", 0.075) or 0.075)
         custom_p2p_price = data.get("custom_p2p_price")
         custom_spot_price = data.get("custom_spot_price")
         
-        # Preco Spot Seguro
+        # Preço Spot Seguro
         if custom_spot_price:
             spot_price = float(custom_spot_price)
         elif quotes_cache.get("spot_usdt_brl") and quotes_cache["spot_usdt_brl"].get("ask"):
@@ -215,7 +262,7 @@ def simulate():
         else:
             spot_price = 5.21
             
-        # Preco P2P Seguro
+        # Preço P2P Seguro
         if custom_p2p_price:
             p2p_price = float(custom_p2p_price)
         else:
@@ -225,9 +272,12 @@ def simulate():
         if p2p_price <= 0: p2p_price = 12.10
         if amount <= 0: amount = 1000.0
             
+        # Câmbio Bruto Puro (1 BRL gera X BOB na Binance)
         raw_bob_per_brl = (1.0 / spot_price) * (1.0 - (spot_fee_percent / 100.0)) * p2p_price
+        raw_brl_per_bob = 1.0 / raw_bob_per_brl if raw_bob_per_brl > 0 else 0
         
         if mode == "BRL_TO_BOB":
+            # CLIENTE ENVIA BRL NO PIX -> RECEBE BOB NA BOLIVIA
             brl_input = amount
             usdt_bought_raw = brl_input / spot_price
             spot_fee_usdt = usdt_bought_raw * (spot_fee_percent / 100.0)
@@ -243,7 +293,7 @@ def simulate():
                 bob_client_receives = brl_input * commercial_rate
                 profit_bob = bob_gross - bob_client_receives
                 profit_brl = (profit_bob / p2p_price) * spot_price
-            else: # FIXED_PER_TX
+            else: # FIXED_PER_TX (Taxa fixa em R$)
                 profit_brl = min(brl_input * 0.5, profit_margin_value)
                 brl_for_exchange = brl_input - profit_brl
                 bob_client_receives = (brl_for_exchange / spot_price) * (1.0 - (spot_fee_percent / 100.0)) * p2p_price
@@ -269,28 +319,26 @@ def simulate():
                 "commercial_brl_per_bob": round(commercial_brl_per_bob, 4),
             })
 
-        else: # BOB_TO_BRL
+        else: 
+            # CLIENTE QUER X BOLIVIANOS (BOB) NA BOLÍVIA -> QUANTO COBRAR DELE EM REAIS (BRL)
             bob_target = amount
+            usdt_needed = bob_target / p2p_price
+            brl_cost_pure = (usdt_needed * spot_price) / (1.0 - (spot_fee_percent / 100.0))
+            
             if profit_margin_type == "PERCENT":
+                # Cobramos brl_charge de modo que o lucro seja exatamente profit_margin_value%
                 margin_factor = 1.0 - (profit_margin_value / 100.0)
                 if margin_factor <= 0.1: margin_factor = 0.95
-                bob_gross_needed = bob_target / margin_factor
-                usdt_needed = bob_gross_needed / p2p_price
-                brl_cost = usdt_needed * spot_price / (1.0 - (spot_fee_percent / 100.0))
-                brl_charge_client = brl_cost
-                profit_bob = bob_gross_needed - bob_target
-                profit_brl = (profit_bob / p2p_price) * spot_price
+                brl_charge_client = brl_cost_pure / margin_factor
+                profit_brl = brl_charge_client - brl_cost_pure
+                profit_bob = (profit_brl / spot_price) * p2p_price
             elif profit_margin_type == "FIXED_PER_BOB":
                 commercial_rate = max(0.001, raw_bob_per_brl - profit_margin_value)
                 brl_charge_client = bob_target / commercial_rate
-                usdt_net = (brl_charge_client / spot_price) * (1.0 - (spot_fee_percent / 100.0))
-                bob_gross = usdt_net * p2p_price
-                profit_bob = bob_gross - bob_target
-                profit_brl = (profit_bob / p2p_price) * spot_price
+                profit_brl = brl_charge_client - brl_cost_pure
+                profit_bob = (profit_brl / spot_price) * p2p_price
             else: # FIXED_PER_TX
-                usdt_needed = bob_target / p2p_price
-                brl_cost = usdt_needed * spot_price / (1.0 - (spot_fee_percent / 100.0))
-                brl_charge_client = brl_cost + profit_margin_value
+                brl_charge_client = brl_cost_pure + profit_margin_value
                 profit_brl = profit_margin_value
                 profit_bob = (profit_brl / spot_price) * p2p_price
 
@@ -302,6 +350,8 @@ def simulate():
                 "mode": mode,
                 "bob_target": round(bob_target, 2),
                 "brl_charge_client": round(brl_charge_client, 2),
+                "brl_cost_pure": round(brl_cost_pure, 2),
+                "usdt_needed": round(usdt_needed, 2),
                 "spot_price_usdt_brl": round(spot_price, 4),
                 "p2p_price_usdt_bob": round(p2p_price, 4),
                 "profit_brl": round(profit_brl, 2),

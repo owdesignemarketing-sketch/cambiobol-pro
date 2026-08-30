@@ -3,14 +3,19 @@ let currentQuotes = null;
 let currentSimulation = null;
 let currentMode = 'BRL_TO_BOB'; // 'BRL_TO_BOB' ou 'BOB_TO_BRL'
 let currentMarginType = 'PERCENT';
-let currentMarginValue = 3.0;
+let currentMarginValue = 1.0; // Padrão 1%
 let customP2pPriceSelected = null;
-let countdown = 8;
+let currentTimeframe = '24h'; // '1h' ou '24h'
+
+// Configurações de Timer
+let refreshIntervalSeconds = 15; // Padrão 15 segundos
+let countdown = 15;
 let countdownInterval = null;
 let historyChart = null;
 
 // Elementos DOM
 const countdownTimer = document.getElementById('countdownTimer');
+const refreshIntervalSelect = document.getElementById('refreshIntervalSelect');
 const refreshBtn = document.getElementById('refreshBtn');
 const refreshIcon = document.getElementById('refreshIcon');
 
@@ -31,6 +36,8 @@ const tabBobToBrl = document.getElementById('tabBobToBrl');
 const inputAmount = document.getElementById('inputAmount');
 const inputAmountLabel = document.getElementById('inputAmountLabel');
 const inputCurrencySymbol = document.getElementById('inputCurrencySymbol');
+const modeDescriptionBadge = document.getElementById('modeDescriptionBadge');
+const quickAmountButtonsContainer = document.getElementById('quickAmountButtonsContainer');
 const marginTypeSelect = document.getElementById('marginTypeSelect');
 const customMarginInput = document.getElementById('customMarginInput');
 const marginUnitLabel = document.getElementById('marginUnitLabel');
@@ -38,12 +45,20 @@ const customP2pPriceInput = document.getElementById('customP2pPrice');
 const customSpotFeeInput = document.getElementById('customSpotFee');
 
 // Resultados
+const resClientHeaderLabel = document.getElementById('resClientHeaderLabel');
+const resClientPrefix = document.getElementById('resClientPrefix');
 const resClientReceivesBob = document.getElementById('resClientReceivesBob');
+const resClientSuffix = document.getElementById('resClientSuffix');
 const resOperatorProfitBrl = document.getElementById('resOperatorProfitBrl');
 const resProfitPercentBadge = document.getElementById('resProfitPercentBadge');
+
+const step1Label = document.getElementById('step1Label');
 const resStepPix = document.getElementById('resStepPix');
+const step2Label = document.getElementById('step2Label');
 const resStepUsdt = document.getElementById('resStepUsdt');
+const step3Label = document.getElementById('step3Label');
 const resStepRate = document.getElementById('resStepRate');
+const step4Label = document.getElementById('step4Label');
 const resStepInverse = document.getElementById('resStepInverse');
 
 // P2P Table & Buttons
@@ -53,6 +68,11 @@ const shareWhatsappBtn = document.getElementById('shareWhatsappBtn');
 const installPwaBtn = document.getElementById('installPwaBtn');
 const toast = document.getElementById('toast');
 const toastMsg = document.getElementById('toastMsg');
+
+// Gráfico Timeframe
+const btnTimeframe1h = document.getElementById('btnTimeframe1h');
+const btnTimeframe24h = document.getElementById('btnTimeframe24h');
+const chartSubtitle = document.getElementById('chartSubtitle');
 
 let deferredPrompt = null;
 
@@ -106,31 +126,57 @@ function initChart() {
         data: {
             labels: [],
             datasets: [{
-                label: 'Taxa BRL/BOB',
+                label: 'Câmbio BRL ➔ BOB',
                 data: [],
                 borderColor: '#10b981',
-                backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                borderWidth: 2,
-                tension: 0.3,
+                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                borderWidth: 2.5,
+                tension: 0.25,
                 fill: true,
-                pointRadius: 2,
-                pointHoverRadius: 5
+                pointBackgroundColor: '#10b981',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 1.5,
+                pointRadius: 3.5,
+                pointHoverRadius: 6.5
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index',
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
                     backgroundColor: '#111827',
-                    titleColor: '#94a3b8',
+                    titleColor: '#f0b90b',
                     bodyColor: '#f8fafc',
-                    borderColor: '#1f293d',
+                    borderColor: '#374151',
                     borderWidth: 1,
+                    padding: 10,
+                    boxPadding: 4,
+                    usePointStyle: true,
                     callbacks: {
+                        title: function(context) {
+                            const index = context[0].dataIndex;
+                            const historyList = currentTimeframe === '24h' ? (currentQuotes?.history_24h || []) : (currentQuotes?.history_1h || []);
+                            const item = historyList[index];
+                            return item?.full_time ? `📅 ${item.full_time}` : `⏰ ${context[0].label}`;
+                        },
                         label: function(context) {
-                            return ` 1 BRL = ${context.parsed.y.toFixed(4)} BOB`;
+                            const val = Number(context.parsed.y).toFixed(4);
+                            return ` 🇧🇴 1 BRL = ${val} BOB`;
+                        },
+                        afterLabel: function(context) {
+                            const index = context.dataIndex;
+                            const historyList = currentTimeframe === '24h' ? (currentQuotes?.history_24h || []) : (currentQuotes?.history_1h || []);
+                            const item = historyList[index];
+                            if (item) {
+                                return ` • Spot USDT/BRL: R$ ${item.spot_usdt_brl}\n • P2P USDT/BOB: ${item.p2p_usdt_bob} Bs.`;
+                            }
+                            return '';
                         }
                     }
                 }
@@ -138,11 +184,11 @@ function initChart() {
             scales: {
                 x: {
                     grid: { color: 'rgba(31, 41, 61, 0.5)' },
-                    ticks: { color: '#64748b', font: { size: 10 } }
+                    ticks: { color: '#94a3b8', font: { size: 10 } }
                 },
                 y: {
                     grid: { color: 'rgba(31, 41, 61, 0.5)' },
-                    ticks: { color: '#64748b', font: { size: 10 } }
+                    ticks: { color: '#94a3b8', font: { size: 10 } }
                 }
             }
         }
@@ -154,6 +200,12 @@ function setupEventListeners() {
     // Alternar Abas BRL ➔ BOB e BOB ➔ BRL
     tabBrlToBob.addEventListener('click', () => setMode('BRL_TO_BOB'));
     tabBobToBrl.addEventListener('click', () => setMode('BOB_TO_BRL'));
+
+    // Seletor de Intervalo de Atualização (15s, 30s, 60s, Manual)
+    refreshIntervalSelect.addEventListener('change', (e) => {
+        refreshIntervalSeconds = parseInt(e.target.value);
+        resetCountdown();
+    });
 
     // Inputs de Cálculo
     inputAmount.addEventListener('input', runSimulation);
@@ -168,7 +220,7 @@ function setupEventListeners() {
         currentMarginType = e.target.value;
         if (currentMarginType === 'PERCENT') {
             marginUnitLabel.textContent = '%';
-            if (currentMarginValue > 20) currentMarginValue = 3.0;
+            if (currentMarginValue > 20) currentMarginValue = 1.0;
         } else if (currentMarginType === 'FIXED_PER_BOB') {
             marginUnitLabel.textContent = 'R$/Bs';
             currentMarginValue = 0.05;
@@ -181,7 +233,7 @@ function setupEventListeners() {
         runSimulation();
     });
 
-    // Botões Rápidos de Margem
+    // Botões Rápidos de Margem (0.5%, 0.75%, 1.0%, etc.)
     document.querySelectorAll('.margin-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             currentMarginType = 'PERCENT';
@@ -195,12 +247,7 @@ function setupEventListeners() {
     });
 
     // Botões Rápidos de Valor
-    document.querySelectorAll('.quick-amount-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            inputAmount.value = btn.dataset.amount;
-            runSimulation();
-        });
-    });
+    setupQuickAmountButtons();
 
     // Custom P2P Price & Spot Fee
     customP2pPriceInput.addEventListener('input', (e) => {
@@ -218,6 +265,35 @@ function setupEventListeners() {
     // Botões WhatsApp
     copyWhatsappBtn.addEventListener('click', copyWhatsappMessage);
     shareWhatsappBtn.addEventListener('click', openWhatsappDirect);
+
+    // Botões Timeframe do Gráfico (1h vs 24h)
+    btnTimeframe1h.addEventListener('click', () => setChartTimeframe('1h'));
+    btnTimeframe24h.addEventListener('click', () => setChartTimeframe('24h'));
+}
+
+function setupQuickAmountButtons() {
+    quickAmountButtonsContainer.querySelectorAll('.quick-amount-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            inputAmount.value = btn.dataset.amount;
+            runSimulation();
+        });
+    });
+}
+
+function setChartTimeframe(tf) {
+    currentTimeframe = tf;
+    if (tf === '1h') {
+        btnTimeframe1h.className = 'timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[11px]';
+        btnTimeframe24h.className = 'timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[11px]';
+        chartSubtitle.textContent = '*Passe o cursor sobre os pontos para ver o câmbio a cada 1 minuto.';
+    } else {
+        btnTimeframe24h.className = 'timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[11px]';
+        btnTimeframe1h.className = 'timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[11px]';
+        chartSubtitle.textContent = '*Passe o cursor sobre os pontos para ver o câmbio exato por hora.';
+    }
+    if (currentQuotes) {
+        renderHistoryChart(currentQuotes);
+    }
 }
 
 function setMode(mode) {
@@ -227,43 +303,89 @@ function setMode(mode) {
         tabBobToBrl.className = 'tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5';
         inputAmountLabel.textContent = 'Valor a receber no PIX (Reais - BRL)';
         inputCurrencySymbol.textContent = 'R$';
+        modeDescriptionBadge.textContent = 'Cliente envia R$ ➔ Recebe Bs.';
+        modeDescriptionBadge.className = 'text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded font-semibold';
+        
+        resClientHeaderLabel.textContent = 'Valor a Entregar ao Cliente na Bolívia';
+        resClientPrefix.textContent = 'BOB';
+        resClientSuffix.textContent = 'Bs.';
+        
+        step1Label.textContent = '1. PIX Recebido';
+        step2Label.textContent = '2. USDT Comprado';
+        step3Label.textContent = '3. Câmbio Fechado';
+        step4Label.textContent = '4. Custo p/ BOB';
+
+        quickAmountButtonsContainer.innerHTML = `
+            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="500">500</button>
+            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="1000">1K</button>
+            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="2000">2K</button>
+            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="5000">5K</button>
+        `;
         if (inputAmount.value === '5000') inputAmount.value = '1000';
     } else {
         tabBobToBrl.className = 'tab-btn px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow-md transition-all flex items-center gap-1.5';
         tabBrlToBob.className = 'tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5';
         inputAmountLabel.textContent = 'Valor solicitado pelo cliente (Bolivianos - BOB)';
         inputCurrencySymbol.textContent = 'Bs.';
+        modeDescriptionBadge.textContent = 'Cliente precisa de Bs. ➔ Cobrar R$ no PIX';
+        modeDescriptionBadge.className = 'text-[10px] text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded font-semibold';
+        
+        resClientHeaderLabel.textContent = 'Valor a Cobrar do Cliente no PIX';
+        resClientPrefix.textContent = 'BRL';
+        resClientSuffix.textContent = 'R$';
+
+        step1Label.textContent = '1. Custo Real Puro';
+        step2Label.textContent = '2. USDT a Vender';
+        step3Label.textContent = '3. Câmbio Comercial';
+        step4Label.textContent = '4. Cobrar p/ BOB';
+
+        quickAmountButtonsContainer.innerHTML = `
+            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="2000">2K</button>
+            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="5000">5K</button>
+            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="10000">10K</button>
+            <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="20000">20K</button>
+        `;
         if (inputAmount.value === '1000') inputAmount.value = '5000';
     }
+    setupQuickAmountButtons();
     runSimulation();
 }
 
 function updateMarginButtonsActiveState() {
     document.querySelectorAll('.margin-btn').forEach(btn => {
         if (currentMarginType === 'PERCENT' && parseFloat(btn.dataset.val) === currentMarginValue) {
-            btn.className = 'margin-btn px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95';
+            btn.className = 'margin-btn px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95';
         } else {
-            btn.className = 'margin-btn px-3 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95';
+            btn.className = 'margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95';
         }
     });
 }
 
 function startCountdown() {
-    countdown = 8;
     if (countdownInterval) clearInterval(countdownInterval);
+    if (refreshIntervalSeconds === 0) {
+        countdownTimer.textContent = 'Manual';
+        return;
+    }
+    countdown = refreshIntervalSeconds;
+    countdownTimer.textContent = `${countdown}s`;
+
     countdownInterval = setInterval(() => {
+        if (refreshIntervalSeconds === 0) {
+            countdownTimer.textContent = 'Manual';
+            return;
+        }
         countdown--;
         if (countdown <= 0) {
             fetchQuotes();
-            countdown = 8;
+            countdown = refreshIntervalSeconds;
         }
         countdownTimer.textContent = `${countdown}s`;
     }, 1000);
 }
 
 function resetCountdown() {
-    countdown = 8;
-    countdownTimer.textContent = `${countdown}s`;
+    startCountdown();
 }
 
 // Busca Cotações no Backend
@@ -278,7 +400,7 @@ async function fetchQuotes(isManual = false) {
             currentQuotes = data;
             renderKPIs(data);
             renderP2PTable(data.p2p_ads_bob || []);
-            renderHistoryChart(data.history || []);
+            renderHistoryChart(data);
             runSimulation();
         }
     } catch (err) {
@@ -312,12 +434,12 @@ function renderKPIs(data) {
     let commercialRate = data.rate_brl_bob_raw;
     if (currentMarginType === 'PERCENT') {
         commercialRate = data.rate_brl_bob_raw * (1 - (currentMarginValue / 100.0));
-        kpiMarginBadge.textContent = `Lucro: ${currentMarginValue}%`;
+        kpiMarginBadge.textContent = `LUCRO: ${currentMarginValue}%`;
     } else if (currentMarginType === 'FIXED_PER_BOB') {
         commercialRate = Math.max(0.01, data.rate_brl_bob_raw - currentMarginValue);
-        kpiMarginBadge.textContent = `Lucro: -${currentMarginValue} Bs/R$`;
+        kpiMarginBadge.textContent = `LUCRO: -${currentMarginValue} Bs/R$`;
     } else {
-        kpiMarginBadge.textContent = `Taxa: R$ ${currentMarginValue}`;
+        kpiMarginBadge.textContent = `TAXA: R$ ${currentMarginValue}`;
     }
 
     const commercialInverse = commercialRate > 0 ? (1.0 / commercialRate) : 0;
@@ -325,15 +447,15 @@ function renderKPIs(data) {
     kpiCommercialInverse.textContent = `R$ ${commercialInverse.toFixed(4)}`;
 }
 
-// Renderiza Tabela de Ofertas P2P
+// Renderiza Tabela de Ofertas P2P com Badge de Verificados
 function renderP2PTable(ads) {
     if (!ads || ads.length === 0) {
-        p2pTableBody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-slate-500">Nenhum anúncio disponível no momento.</td></tr>`;
+        p2pTableBody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-slate-500">Nenhum anunciante verificado online no momento.</td></tr>`;
         return;
     }
 
     let html = '';
-    ads.slice(0, 7).forEach((ad, idx) => {
+    ads.slice(0, 8).forEach((ad, idx) => {
         const isBest = idx === 0;
         const methodsBadges = ad.trade_methods.slice(0, 3).map(m => {
             let color = 'bg-slate-800 text-slate-300 border-slate-700';
@@ -346,12 +468,15 @@ function renderP2PTable(ads) {
         html += `
             <tr class="hover:bg-slate-800/40 transition-colors ${isBest ? 'bg-binanceYellow/5' : ''}">
                 <td class="py-2.5 pr-2">
-                    <div class="flex items-center gap-1.5">
+                    <div class="flex items-center gap-1.5 flex-wrap">
                         <span class="font-bold text-white text-xs">${ad.nick_name}</span>
-                        ${isBest ? '<span class="text-[9px] px-1 py-0.2 bg-binanceYellow text-black font-extrabold rounded">TOP 1</span>' : ''}
+                        <span class="text-[9px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold rounded flex items-center gap-0.5">
+                            <i class="fa-solid fa-circle-check text-[8px]"></i> Verificado
+                        </span>
+                        ${isBest ? '<span class="text-[9px] px-1 py-0.2 bg-binanceYellow text-black font-extrabold rounded">MELHOR</span>' : ''}
                     </div>
                     <div class="text-[10px] text-slate-400 mt-0.5">
-                        <span class="text-emerald-400 font-semibold">${ad.month_finish_rate}%</span> (${ad.month_order_count} ordens)
+                        <span class="text-emerald-400 font-semibold">${ad.month_finish_rate}%</span> (${ad.month_order_count} ordens concluídas)
                     </div>
                     <div class="mt-1 flex flex-wrap">${methodsBadges}</div>
                 </td>
@@ -363,7 +488,7 @@ function renderP2PTable(ads) {
                     <div class="text-[9px] text-slate-500">até ${formatNumber(ad.max_amount)}</div>
                 </td>
                 <td class="py-2.5 text-center align-top">
-                    <button onclick="applyP2pPrice(${ad.price})" class="px-2 py-1 bg-cardBorder hover:bg-binanceYellow hover:text-black rounded text-[10px] font-bold text-slate-200 transition-all">
+                    <button onclick="applyP2pPrice(${ad.price})" class="px-2.5 py-1 bg-cardBorder hover:bg-binanceYellow hover:text-black rounded text-[10px] font-bold text-slate-200 transition-all shadow-sm">
                         Usar
                     </button>
                 </td>
@@ -380,16 +505,19 @@ window.applyP2pPrice = function(price) {
     runSimulation();
 };
 
-// Renderiza Gráfico Histórico
-function renderHistoryChart(history) {
-    if (!historyChart || !history || history.length === 0) return;
+// Renderiza Gráfico Histórico (1h ou 24h)
+function renderHistoryChart(data) {
+    if (!historyChart) return;
     
-    const labels = history.map(h => h.timestamp);
-    const dataRates = history.map(h => h.rate_brl_bob);
+    const historyList = currentTimeframe === '24h' ? (data.history_24h || []) : (data.history_1h || []);
+    if (historyList.length === 0) return;
+    
+    const labels = historyList.map(h => h.timestamp);
+    const dataRates = historyList.map(h => h.rate_brl_bob);
     
     historyChart.data.labels = labels;
     historyChart.data.datasets[0].data = dataRates;
-    historyChart.update('none'); // Update sem re-render pesado
+    historyChart.update('none');
 }
 
 // Executa Simulação
@@ -436,12 +564,13 @@ function renderSimulationResults(data) {
         resStepRate.textContent = `1 BRL = ${data.commercial_bob_per_brl.toFixed(4)} Bs.`;
         resStepInverse.textContent = `R$ ${data.commercial_brl_per_bob.toFixed(4)}`;
     } else {
-        resClientReceivesBob.textContent = formatNumber(data.bob_target);
+        // Modo BOB -> BRL (Cliente quer X Bolivianos -> Quanto cobrar em Reais)
+        resClientReceivesBob.textContent = `R$ ${formatNumber(data.brl_charge_client)}`;
         resOperatorProfitBrl.textContent = `R$ ${formatNumber(data.profit_brl)}`;
         resProfitPercentBadge.textContent = `(+${data.profit_percent}%)`;
 
-        resStepPix.textContent = `Cobrar R$ ${formatNumber(data.brl_charge_client)}`;
-        resStepUsdt.textContent = `P2P: ${data.p2p_price_usdt_bob.toFixed(2)} Bs`;
+        resStepPix.textContent = `R$ ${formatNumber(data.brl_cost_pure)}`;
+        resStepUsdt.textContent = `${data.usdt_needed.toFixed(2)} USDT`;
         resStepRate.textContent = `1 BRL = ${data.commercial_bob_per_brl.toFixed(4)} Bs.`;
         resStepInverse.textContent = `R$ ${data.commercial_brl_per_bob.toFixed(4)}`;
     }

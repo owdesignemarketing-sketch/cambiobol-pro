@@ -60,22 +60,30 @@
             </div>
         </div>
 
-        <!-- Live Controls, PWA Install & Countdown -->
-        <div class="flex items-center gap-2.5">
+        <!-- Live Controls, PWA Install & Interval Selector -->
+        <div class="flex items-center gap-2.5 flex-wrap">
+            <!-- Seletor de Intervalo de Atualização (15s, 30s, 60s) -->
+            <div class="flex items-center gap-1.5 bg-darkBg/80 border border-cardBorder px-2.5 py-1.5 rounded-lg text-xs text-slate-300">
+                <i class="fa-solid fa-clock-rotate-left text-binanceYellow"></i>
+                <select id="refreshIntervalSelect" class="bg-transparent text-white font-bold focus:outline-none cursor-pointer">
+                    <option value="15" selected class="bg-cardBg text-white">⏱️ 15 segundos</option>
+                    <option value="30" class="bg-cardBg text-white">⏱️ 30 segundos</option>
+                    <option value="60" class="bg-cardBg text-white">⏱️ 60 segundos</option>
+                    <option value="0" class="bg-cardBg text-white">⏸️ Manual</option>
+                </select>
+                <span id="countdownTimer" class="font-mono font-bold text-binanceYellow text-xs pl-1 border-l border-cardBorder">15s</span>
+            </div>
+
             <!-- Botão Instalar App no Celular -->
             <button id="installPwaBtn" class="hidden flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-xs font-bold transition-all border border-emerald-500/30">
                 <i class="fa-solid fa-mobile-screen-button"></i>
                 <span>Instalar App</span>
             </button>
 
-            <div class="hidden sm:flex items-center gap-2 bg-darkBg/60 border border-cardBorder px-3 py-1.5 rounded-lg text-xs text-slate-300">
-                <i class="fa-solid fa-clock-rotate-left text-binanceYellow"></i>
-                <span>Atualiza em:</span>
-                <span id="countdownTimer" class="font-mono font-bold text-white text-sm">8s</span>
-            </div>
+            <!-- Botão Atualizar Agora -->
             <button id="refreshBtn" class="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-cardBorder hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all active:scale-95 border border-slate-700 shadow-sm">
                 <i id="refreshIcon" class="fa-solid fa-rotate"></i>
-                <span class="hidden sm:inline">Atualizar Agora</span>
+                <span class="hidden sm:inline">Atualizar</span>
             </button>
         </div>
     </header>
@@ -118,7 +126,7 @@
                 </div>
                 <div class="text-[11px] text-slate-400 pt-3 border-t border-cardBorder/40 flex items-center justify-between mt-2">
                     <span>Top 3: <span id="kpiP2pTop3" class="text-slate-300 font-mono">--</span> Bs.</span>
-                    <span class="text-emerald-400 font-medium">Melhor Ordem</span>
+                    <span class="text-emerald-400 font-medium flex items-center gap-1"><i class="fa-solid fa-circle-check text-[10px]"></i> Verificados</span>
                 </div>
             </div>
 
@@ -145,7 +153,7 @@
                 <div>
                     <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
                         <span class="flex items-center gap-1.5 text-slate-200"><i class="fa-solid fa-hand-holding-dollar text-emerald-400"></i> Câmbio ao Cliente</span>
-                        <span id="kpiMarginBadge" class="text-[10px] uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-bold border border-emerald-500/30">LUCRO: 3.0%</span>
+                        <span id="kpiMarginBadge" class="text-[10px] uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-bold border border-emerald-500/30">LUCRO: 1.0%</span>
                     </div>
                     <div class="flex items-baseline gap-1.5 mt-1">
                         <span class="text-xs text-slate-400 font-bold">Bs.</span>
@@ -174,13 +182,15 @@
                             <h2 class="text-lg font-bold text-white tracking-tight">Calculadora de Câmbio & Remessa</h2>
                         </div>
                         
-                        <!-- Mode Switch Tabs -->
+                        <!-- Mode Switch Tabs com títulos claros -->
                         <div class="inline-flex p-1 bg-darkBg border border-cardBorder rounded-xl text-xs font-semibold">
                             <button id="tabBrlToBob" class="tab-btn px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow-md transition-all flex items-center gap-1.5">
-                                <span class="font-bold">BRL</span> <i class="fa-solid fa-arrow-right text-[10px]"></i> <span class="font-bold">BOB</span>
+                                <span class="font-bold">BRL ➔ BOB</span>
+                                <span class="text-[10px] text-blue-200 hidden sm:inline">(Envio R$)</span>
                             </button>
                             <button id="tabBobToBrl" class="tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
-                                <span class="font-bold">BOB</span> <i class="fa-solid fa-arrow-right text-[10px]"></i> <span class="font-bold">BRL</span>
+                                <span class="font-bold">BOB ➔ BRL</span>
+                                <span class="text-[10px] text-slate-400 hidden sm:inline">(Meta Bs.)</span>
                             </button>
                         </div>
                     </div>
@@ -190,9 +200,15 @@
                         
                         <!-- Main Amount Input -->
                         <div>
-                            <label id="inputAmountLabel" for="inputAmount" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                                Valor a receber no PIX (Reais - BRL)
-                            </label>
+                            <div class="flex items-center justify-between mb-2">
+                                <label id="inputAmountLabel" for="inputAmount" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                                    Valor a receber no PIX (Reais - BRL)
+                                </label>
+                                <span id="modeDescriptionBadge" class="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded font-semibold">
+                                    Cliente envia R$ ➔ Recebe Bs.
+                                </span>
+                            </div>
+                            
                             <div class="relative rounded-2xl bg-darkBg border-2 border-slate-700 focus-within:border-binanceYellow transition-all shadow-inner flex items-center">
                                 <div class="pl-4 pr-1 text-slate-400 font-bold text-lg select-none" id="inputCurrencySymbol">
                                     R$
@@ -200,7 +216,7 @@
                                 <input type="number" id="inputAmount" value="1000" min="1" step="any" class="w-full bg-transparent pl-2 pr-44 py-3.5 text-2xl lg:text-3xl font-black font-mono text-white focus:outline-none placeholder-slate-600" placeholder="0.00">
                                 
                                 <!-- Botões Rápidos de Valor -->
-                                <div class="absolute right-2.5 flex items-center gap-1.5">
+                                <div class="absolute right-2.5 flex items-center gap-1.5" id="quickAmountButtonsContainer">
                                     <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="500">500</button>
                                     <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="1000">1K</button>
                                     <button type="button" class="quick-amount-btn px-2.5 py-1 bg-cardBorder hover:bg-slate-700 rounded-md text-[11px] font-bold text-slate-300 transition-colors" data-amount="2000">2K</button>
@@ -209,7 +225,7 @@
                             </div>
                         </div>
 
-                        <!-- Profit Margin Selector -->
+                        <!-- Profit Margin Selector com novas opções (0.5%, 0.75%, 1%, etc.) -->
                         <div class="bg-darkBg/70 border border-cardBorder rounded-2xl p-4 space-y-3">
                             <div class="flex items-center justify-between flex-wrap gap-2">
                                 <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
@@ -225,17 +241,20 @@
                                 </div>
                             </div>
 
-                            <!-- Margin Presets & Custom Input -->
-                            <div class="flex flex-wrap items-center gap-2 pt-1" id="marginPresetsContainer">
-                                <button type="button" class="margin-btn px-3 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="1.5">1.5%</button>
-                                <button type="button" class="margin-btn px-3 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="2.0">2.0%</button>
-                                <button type="button" class="margin-btn px-3 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="2.5">2.5%</button>
-                                <button type="button" class="margin-btn px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95" data-val="3.0">3.0%</button>
-                                <button type="button" class="margin-btn px-3 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="4.0">4.0%</button>
-                                <button type="button" class="margin-btn px-3 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="5.0">5.0%</button>
+                            <!-- Margin Presets Rápidos -->
+                            <div class="flex flex-wrap items-center gap-1.5 pt-1" id="marginPresetsContainer">
+                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="0.5">0.5%</button>
+                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="0.75">0.75%</button>
+                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95" data-val="1.0">1.0%</button>
+                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="1.5">1.5%</button>
+                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="2.0">2.0%</button>
+                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="2.5">2.5%</button>
+                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="3.0">3.0%</button>
+                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="4.0">4.0%</button>
+                                <button type="button" class="margin-btn px-2.5 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all active:scale-95" data-val="5.0">5.0%</button>
                                 
                                 <div class="flex items-center gap-1 ml-auto bg-cardBg border border-cardBorder rounded-lg px-2.5 py-1">
-                                    <input type="number" id="customMarginInput" value="3.0" step="0.1" min="0" class="w-14 bg-transparent text-right font-mono font-bold text-white text-xs focus:outline-none">
+                                    <input type="number" id="customMarginInput" value="1.0" step="0.05" min="0" class="w-14 bg-transparent text-right font-mono font-bold text-white text-xs focus:outline-none">
                                     <span id="marginUnitLabel" class="text-xs text-slate-400 font-bold">%</span>
                                 </div>
                             </div>
@@ -264,11 +283,11 @@
                             
                             <div class="flex items-center justify-between border-b border-cardBorder pb-3 flex-wrap gap-2">
                                 <div>
-                                    <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Valor a Entregar ao Cliente na Bolívia</span>
+                                    <span id="resClientHeaderLabel" class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Valor a Entregar ao Cliente na Bolívia</span>
                                     <div class="flex items-baseline gap-2 mt-1">
-                                        <span class="text-emerald-400 font-black text-xs">BOB</span>
+                                        <span id="resClientPrefix" class="text-emerald-400 font-black text-xs">BOB</span>
                                         <span id="resClientReceivesBob" class="text-3xl lg:text-4xl font-black font-mono text-emerald-400 tracking-tight">0.00</span>
-                                        <span class="text-xs text-slate-400">Bs.</span>
+                                        <span id="resClientSuffix" class="text-xs text-slate-400">Bs.</span>
                                     </div>
                                 </div>
                                 <div class="text-right">
@@ -284,19 +303,19 @@
                             <!-- Execution Flow Breakdown -->
                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
                                 <div class="bg-cardBg/60 border border-cardBorder p-3 rounded-xl">
-                                    <span class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">1. PIX Recebido</span>
+                                    <span id="step1Label" class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">1. PIX Recebido</span>
                                     <span id="resStepPix" class="font-mono font-bold text-slate-200">R$ 1.000,00</span>
                                 </div>
                                 <div class="bg-cardBg/60 border border-cardBorder p-3 rounded-xl">
-                                    <span class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">2. USDT Comprado</span>
+                                    <span id="step2Label" class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">2. USDT Comprado</span>
                                     <span id="resStepUsdt" class="font-mono font-bold text-blue-400">0.00 USDT</span>
                                 </div>
                                 <div class="bg-cardBg/60 border border-cardBorder p-3 rounded-xl">
-                                    <span class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">3. Câmbio Fechado</span>
+                                    <span id="step3Label" class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">3. Câmbio Fechado</span>
                                     <span id="resStepRate" class="font-mono font-bold text-binanceYellow">1 = -- Bs.</span>
                                 </div>
                                 <div class="bg-cardBg/60 border border-cardBorder p-3 rounded-xl">
-                                    <span class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">4. Custo p/ BOB</span>
+                                    <span id="step4Label" class="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">4. Custo p/ BOB</span>
                                     <span id="resStepInverse" class="font-mono font-bold text-purple-400">R$ --</span>
                                 </div>
                             </div>
@@ -320,17 +339,19 @@
 
             </section>
 
-            <!-- RIGHT COLUMN: Live P2P Order Book & Chart (5 cols) -->
+            <!-- RIGHT COLUMN: Live P2P Order Book & 1h/24h Chart (5 cols) -->
             <section class="lg:col-span-5 space-y-6">
                 
-                <!-- Live P2P Order Book Table -->
+                <!-- Live P2P Order Book Table (Apenas Verificados) -->
                 <div class="bg-cardBg border border-cardBorder rounded-3xl p-5 shadow-xl">
                     <div class="flex items-center justify-between pb-3 mb-3 border-b border-cardBorder">
                         <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-list-check text-binanceYellow text-base"></i>
-                            <h3 class="text-sm font-bold text-white">Melhores Ofertas P2P (USDT ➔ BOB)</h3>
+                            <i class="fa-solid fa-shield-halved text-emerald-400 text-base"></i>
+                            <h3 class="text-sm font-bold text-white">Melhores Ofertas P2P</h3>
                         </div>
-                        <span class="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded font-mono">Binance P2P</span>
+                        <span class="text-[10px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-circle-check text-[10px]"></i> Apenas Verificados
+                        </span>
                     </div>
 
                     <div class="overflow-x-auto">
@@ -346,28 +367,40 @@
                             <tbody id="p2pTableBody" class="divide-y divide-cardBorder/40">
                                 <tr>
                                     <td colspan="4" class="py-6 text-center text-slate-500">
-                                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Carregando ofertas P2P ao vivo...
+                                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Carregando ofertas P2P verificadas...
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    <p class="text-[10px] text-slate-500 mt-3 italic">*Clique em "Usar" em qualquer ordem para simular exatamente com o preço do comerciante.</p>
+                    <p class="text-[10px] text-slate-500 mt-3 italic">*Clique em "Usar" para aplicar a cotação de qualquer comerciante na calculadora.</p>
                 </div>
 
-                <!-- Rate History & Intraday Chart -->
+                <!-- Rate History & Intraday Chart com abas de 1 Hora e 24 Horas -->
                 <div class="bg-cardBg border border-cardBorder rounded-3xl p-5 shadow-xl space-y-3">
-                    <div class="flex items-center justify-between pb-2 border-b border-cardBorder">
+                    <div class="flex items-center justify-between pb-2 border-b border-cardBorder flex-wrap gap-2">
                         <div class="flex items-center gap-2">
                             <i class="fa-solid fa-wave-square text-blue-400 text-sm"></i>
-                            <h3 class="text-sm font-bold text-white">Oscilação do Câmbio (Hoje)</h3>
+                            <h3 class="text-sm font-bold text-white">Oscilação do Câmbio BRL/BOB</h3>
                         </div>
-                        <span class="text-[10px] text-slate-400 font-mono">BRL / BOB</span>
+                        
+                        <!-- Seletor 1h vs 24h -->
+                        <div class="inline-flex p-1 bg-darkBg border border-cardBorder rounded-lg text-xs font-semibold">
+                            <button id="btnTimeframe1h" class="timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[11px]">
+                                1 Hora
+                            </button>
+                            <button id="btnTimeframe24h" class="timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[11px]">
+                                24 Horas
+                            </button>
+                        </div>
                     </div>
                     
-                    <div class="h-44 w-full">
+                    <div class="h-48 w-full">
                         <canvas id="rateHistoryChart"></canvas>
                     </div>
+                    <p class="text-[10px] text-slate-400 text-right font-mono" id="chartSubtitle">
+                        *Passe o cursor sobre os pontos para ver o câmbio exato por hora.
+                    </p>
                 </div>
 
             </section>
