@@ -8,6 +8,9 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
 
+# Fuso Horário Oficial da Bolívia (UTC-4 / La Paz / Santa Cruz / Cochabamba)
+BOLIVIA_TZ = datetime.timezone(datetime.timedelta(hours=-4))
+
 # Cache de cotações em memória
 quotes_cache = {
     "last_updated": time.time(),
@@ -28,7 +31,7 @@ HEADERS_SPOT = {
 
 HEADERS_P2P = {
     'Accept': '*/*',
-    'Accept-Language': 'es-LA,es;q=0.9,pt-BR;q=0.8,en-US;q=0.7',
+    'Accept-Language': 'es-BO,es-LA,es;q=0.9,pt-BR;q=0.8,en-US;q=0.7',
     'Cache-Control': 'no-cache',
     'Client-Type': 'web',
     'Content-Type': 'application/json',
@@ -142,13 +145,12 @@ def fetch_binance_klines(symbol="USDTBRL", interval="1h", limit=24):
     return []
 
 def generate_fallback_history_24h(best_p2p, spot_price):
-    """Gera 24 pontos com horários reais caso a API de Klines esteja offline."""
-    now = datetime.datetime.now()
+    """Gera 24 pontos até a hora atual presente na Bolívia (UTC-4)."""
+    now = datetime.datetime.now(BOLIVIA_TZ)
     points = []
     for i in range(23, -1, -1):
         t = now - datetime.timedelta(hours=i)
         t_str = t.strftime('%H:00')
-        # Pequena variação para realismo visual no gráfico
         var_factor = 1.0 + ((i % 5 - 2) * 0.0008)
         sim_spot = spot_price * var_factor
         rate = round((1.0 / sim_spot) * best_p2p, 4)
@@ -162,8 +164,8 @@ def generate_fallback_history_24h(best_p2p, spot_price):
     return points
 
 def generate_fallback_history_1h(best_p2p, spot_price):
-    """Gera 60 pontos por minuto caso a API de Klines esteja offline."""
-    now = datetime.datetime.now()
+    """Gera 60 pontos até o minuto presente na Bolívia (UTC-4)."""
+    now = datetime.datetime.now(BOLIVIA_TZ)
     points = []
     for i in range(59, -1, -1):
         t = now - datetime.timedelta(minutes=i)
@@ -181,7 +183,7 @@ def generate_fallback_history_1h(best_p2p, spot_price):
     return points
 
 def update_all_quotes():
-    """Atualiza cotações, P2P e histórico com garantia de nunca ficar vazio."""
+    """Atualiza cotações, P2P e histórico calibrado no horário da Bolívia (UTC-4)."""
     global quotes_cache
     try:
         spot = fetch_binance_spot_usdt_brl()
@@ -208,12 +210,13 @@ def update_all_quotes():
             quotes_cache["rate_brl_bob_raw"] = round(raw_bob_per_brl, 4)
             quotes_cache["rate_bob_brl_raw"] = round(raw_brl_per_bob, 4)
             
-        # Atualiza histórico 24h
+        # Atualiza histórico 24h calibrado no Fuso da Bolívia (UTC-4)
         klines_24h = fetch_binance_klines(symbol="USDTBRL", interval="1h", limit=24)
         if klines_24h and len(klines_24h) > 0:
             points_24h = []
             for k in klines_24h:
-                t_str = datetime.datetime.fromtimestamp(k[0] / 1000).strftime('%H:00')
+                t_dt = datetime.datetime.fromtimestamp(k[0] / 1000, tz=datetime.timezone.utc).astimezone(BOLIVIA_TZ)
+                t_str = t_dt.strftime('%H:00')
                 close_spot = float(k[4])
                 rate = round((1.0 / close_spot) * best_p2p_bob, 4) if close_spot > 0 else 0
                 points_24h.append({
@@ -221,18 +224,19 @@ def update_all_quotes():
                     "spot_usdt_brl": round(close_spot, 4),
                     "p2p_usdt_bob": round(best_p2p_bob, 2),
                     "rate_brl_bob": rate,
-                    "full_time": datetime.datetime.fromtimestamp(k[0] / 1000).strftime('%d/%m %H:%M')
+                    "full_time": t_dt.strftime('%d/%m %H:%M')
                 })
             quotes_cache["history_24h"] = points_24h
         elif not quotes_cache.get("history_24h"):
             quotes_cache["history_24h"] = generate_fallback_history_24h(best_p2p_bob, usdt_brl_buy_price)
 
-        # Atualiza histórico 1h
+        # Atualiza histórico 1h calibrado no Fuso da Bolívia (UTC-4)
         klines_1h = fetch_binance_klines(symbol="USDTBRL", interval="1m", limit=60)
         if klines_1h and len(klines_1h) > 0:
             points_1h = []
             for k in klines_1h:
-                t_str = datetime.datetime.fromtimestamp(k[0] / 1000).strftime('%H:%M')
+                t_dt = datetime.datetime.fromtimestamp(k[0] / 1000, tz=datetime.timezone.utc).astimezone(BOLIVIA_TZ)
+                t_str = t_dt.strftime('%H:%M')
                 close_spot = float(k[4])
                 rate = round((1.0 / close_spot) * best_p2p_bob, 4) if close_spot > 0 else 0
                 points_1h.append({
@@ -240,7 +244,7 @@ def update_all_quotes():
                     "spot_usdt_brl": round(close_spot, 4),
                     "p2p_usdt_bob": round(best_p2p_bob, 2),
                     "rate_brl_bob": rate,
-                    "full_time": datetime.datetime.fromtimestamp(k[0] / 1000).strftime('%H:%M')
+                    "full_time": t_dt.strftime('%H:%M')
                 })
             quotes_cache["history_1h"] = points_1h
         elif not quotes_cache.get("history_1h"):
@@ -282,6 +286,7 @@ def get_quotes():
         return jsonify({
             "status": "success",
             "last_updated": quotes_cache.get("last_updated", time.time()),
+            "timezone": "America/La_Paz (UTC-4)",
             "spot_usdt_brl": quotes_cache.get("spot_usdt_brl"),
             "best_p2p_bob": quotes_cache.get("best_p2p_bob", 11.91),
             "top3_avg_bob": quotes_cache.get("top3_avg_bob", 11.91),
