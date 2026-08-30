@@ -42,11 +42,17 @@
 </head>
 <body class="bg-darkBg text-slate-100 min-h-screen font-sans antialiased selection:bg-binanceYellow selection:text-black pb-10">
 
-    <!-- Top Navigation Bar (Responsivo Mobile e Desktop) -->
+    <!-- Offline Alert Banner (Surge apenas quando sem conexão) -->
+    <div id="offlineBanner" class="hidden bg-rose-600/90 text-white px-4 py-2 text-center text-xs font-bold shadow-lg flex items-center justify-center gap-2 sticky top-0 z-[60] backdrop-blur-md">
+        <i class="fa-solid fa-triangle-exclamation text-yellow-300"></i>
+        <span>Atenção: Sem conexão com a Binance. Cotações congeladas para sua segurança.</span>
+    </div>
+
+    <!-- Top Navigation Bar -->
     <header class="border-b border-cardBorder bg-cardBg/95 backdrop-blur-md sticky top-0 z-50 px-3 sm:px-6 lg:px-8 py-3">
         <div class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             
-            <!-- Logo & Status -->
+            <!-- Logo & Status Real-Time -->
             <div class="flex items-center justify-between w-full sm:w-auto">
                 <div class="flex items-center gap-2.5">
                     <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-binanceYellow to-emerald-400 flex items-center justify-center shadow-lg shadow-yellow-500/10 flex-shrink-0">
@@ -55,12 +61,14 @@
                     <div>
                         <div class="flex items-center gap-1.5 sm:gap-2">
                             <h1 class="text-lg sm:text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-binanceYellow bg-clip-text text-transparent">CâmbioBol <span class="text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full bg-binanceYellow/20 text-binanceYellow border border-binanceYellow/30 font-semibold uppercase">PRO</span></h1>
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            
+                            <!-- Dynamic Live / Offline Status Badge -->
+                            <span id="liveStatusBadge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                                 Ao Vivo
                             </span>
                         </div>
-                        <p class="text-[10px] sm:text-xs text-slate-400 font-medium">BRL ➔ USDT (Spot) ➔ BOB (P2P)</p>
+                        <p class="text-[10px] sm:text-xs text-slate-400 font-medium">BRL ➔ USDT (Spot) ➔ BOB (P2P Venda)</p>
                     </div>
                 </div>
 
@@ -106,7 +114,7 @@
     <!-- Main Container -->
     <main class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
 
-        <!-- Real-Time Metrics Banner (2 Colunas no Mobile / 4 no Desktop) -->
+        <!-- Real-Time Metrics Banner -->
         <section class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
             
             <!-- Card 1: Spot USDT/BRL -->
@@ -127,7 +135,7 @@
                 </div>
             </div>
 
-            <!-- Card 2: P2P USDT/BOB -->
+            <!-- Card 2: P2P USDT/BOB (Venda Estrita) -->
             <div class="kpi-card bg-cardBg border border-cardBorder rounded-2xl p-3.5 sm:p-5 hover:border-yellow-500/40 shadow-lg shadow-black/20 relative overflow-hidden flex flex-col justify-between min-h-[125px] sm:min-h-[145px]">
                 <div>
                     <div class="flex items-center justify-between text-slate-400 text-[11px] sm:text-xs font-semibold mb-1 sm:mb-2">
@@ -145,7 +153,7 @@
                 </div>
             </div>
 
-            <!-- Card 3: Câmbio Bruto Efetivo (Custo Real) -->
+            <!-- Card 3: Câmbio Bruto Efetivo -->
             <div class="kpi-card bg-cardBg border border-cardBorder rounded-2xl p-3.5 sm:p-5 hover:border-purple-500/40 shadow-lg shadow-black/20 relative overflow-hidden flex flex-col justify-between min-h-[125px] sm:min-h-[145px]">
                 <div>
                     <div class="flex items-center justify-between text-slate-400 text-[11px] sm:text-xs font-semibold mb-1 sm:mb-2">
@@ -163,7 +171,7 @@
                 </div>
             </div>
 
-            <!-- Card 4: Câmbio Comercial (Com Lucro) -->
+            <!-- Card 4: Câmbio Comercial -->
             <div class="kpi-card bg-cardBg border border-emerald-500/30 rounded-2xl p-3.5 sm:p-5 hover:border-emerald-500/60 shadow-lg shadow-black/20 relative overflow-hidden flex flex-col justify-between min-h-[125px] sm:min-h-[145px] bg-gradient-to-br from-cardBg via-cardBg to-emerald-950/30">
                 <div>
                     <div class="flex items-center justify-between text-slate-400 text-[11px] sm:text-xs font-semibold mb-1 sm:mb-2">
@@ -186,7 +194,7 @@
         <!-- Main Content Area: 2 Columns Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
             
-            <!-- LEFT COLUMN: Calculator & Simulator (7 cols) -->
+            <!-- LEFT COLUMN: Calculator & Simulator -->
             <section class="lg:col-span-7 space-y-4 sm:space-y-6">
                 
                 <!-- Calculator Card -->
@@ -257,12 +265,12 @@
                                 </div>
                             </div>
 
-                            <!-- Banner Explicativo da Margem Inteligente Ativa -->
+                            <!-- Banner Explicativo da Margem Inteligente -->
                             <div id="smartTierBanner" class="bg-gradient-to-r from-yellow-500/10 via-emerald-500/10 to-blue-500/10 border border-yellow-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs">
                                 <div class="flex items-center gap-2">
                                     <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
                                     <span id="smartTierStatusText" class="text-slate-200 font-semibold text-[11px] sm:text-xs">
-                                        Regra Ativa: <span class="text-binanceYellow font-bold" id="smartTierActiveRule">Taxa Fixa R$ 10</span>
+                                        Regra Ativa: <span class="text-binanceYellow font-bold" id="smartTierActiveRule">Margem 1.0% (>= 1K)</span>
                                     </span>
                                 </div>
                                 <span class="text-[10px] text-slate-400 hidden sm:inline">&lt;500 (R$7) | 500-1K (R$10) | &gt;1K (1%)</span>
@@ -325,7 +333,7 @@
                                 </div>
                             </div>
 
-                            <!-- Execution Flow Breakdown (2x2 no mobile) -->
+                            <!-- Execution Flow Breakdown -->
                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
                                 <div class="bg-cardBg/60 border border-cardBorder p-2.5 sm:p-3 rounded-xl">
                                     <span id="step1Label" class="text-[9px] sm:text-[10px] text-slate-400 uppercase font-semibold block mb-0.5 truncate">1. PIX Recebido</span>
@@ -364,15 +372,15 @@
 
             </section>
 
-            <!-- RIGHT COLUMN: Live P2P Order Book & 1h/24h Chart (5 cols) -->
+            <!-- RIGHT COLUMN: Live P2P Order Book & 1h/24h Chart -->
             <section class="lg:col-span-5 space-y-4 sm:space-y-6">
                 
-                <!-- Live P2P Order Book Table (Apenas Verificados) -->
+                <!-- Live P2P Order Book Table -->
                 <div class="bg-cardBg border border-cardBorder rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xl">
                     <div class="flex items-center justify-between pb-2.5 sm:pb-3 mb-2.5 sm:mb-3 border-b border-cardBorder">
                         <div class="flex items-center gap-2">
                             <i class="fa-solid fa-shield-halved text-emerald-400 text-base"></i>
-                            <h3 class="text-xs sm:text-sm font-bold text-white">Melhores Ofertas P2P</h3>
+                            <h3 class="text-xs sm:text-sm font-bold text-white">Melhores Ofertas P2P (Venda)</h3>
                         </div>
                         <span class="text-[9px] sm:text-[10px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                             <i class="fa-solid fa-circle-check text-[9px]"></i> Verificados
@@ -384,7 +392,7 @@
                             <thead>
                                 <tr class="text-slate-400 border-b border-cardBorder/60 text-[9px] sm:text-[10px] uppercase font-semibold">
                                     <th class="pb-2">Comerciante</th>
-                                    <th class="pb-2 text-right">Preço</th>
+                                    <th class="pb-2 text-right">Paga</th>
                                     <th class="pb-2 text-right">Limites (Bs.)</th>
                                     <th class="pb-2 text-center">Ação</th>
                                 </tr>
@@ -401,7 +409,7 @@
                     <p class="text-[9px] sm:text-[10px] text-slate-500 mt-2.5 italic">*Clique em "Usar" para aplicar a cotação de qualquer comerciante.</p>
                 </div>
 
-                <!-- Rate History & Intraday Chart com Pontos Visíveis e Card de Destaque -->
+                <!-- Rate History & Intraday Chart -->
                 <div class="bg-cardBg border border-cardBorder rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xl space-y-3">
                     <div class="flex items-center justify-between pb-2 border-b border-cardBorder flex-wrap gap-2">
                         <div class="flex items-center gap-2">
@@ -420,7 +428,7 @@
                         </div>
                     </div>
 
-                    <!-- Card de Informação do Ponto Selecionado -->
+                    <!-- Card Inspector do Ponto Selecionado -->
                     <div id="chartPointInspector" class="bg-darkBg/90 border border-cardBorder rounded-xl p-2.5 flex items-center justify-between text-xs">
                         <div class="flex items-center gap-2">
                             <span class="w-2.5 h-2.5 rounded-full bg-binanceYellow border-2 border-white flex-shrink-0"></span>

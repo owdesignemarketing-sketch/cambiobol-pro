@@ -1,14 +1,15 @@
 // Estado Global do App
 let currentQuotes = null;
 let currentSimulation = null;
-let currentMode = 'BRL_TO_BOB'; // 'BRL_TO_BOB' ou 'BOB_TO_BRL'
-let currentMarginType = 'SMART_TIER'; // 'SMART_TIER', 'PERCENT', 'FIXED_PER_BOB', 'FIXED_PER_TX'
-let currentMarginValue = 1.0; // Padrão 1% para >= 1K
+let currentMode = 'BRL_TO_BOB';
+let currentMarginType = 'SMART_TIER';
+let currentMarginValue = 1.0;
 let customP2pPriceSelected = null;
-let currentTimeframe = '24h'; // '1h' ou '24h'
+let customP2pNickSelected = null;
+let currentTimeframe = '24h';
 
 // Configurações de Timer
-let refreshIntervalSeconds = 15; // Padrão 15 segundos
+let refreshIntervalSeconds = 15;
 let countdown = 15;
 let countdownInterval = null;
 let historyChart = null;
@@ -18,6 +19,8 @@ const countdownTimer = document.getElementById('countdownTimer');
 const refreshIntervalSelect = document.getElementById('refreshIntervalSelect');
 const refreshBtn = document.getElementById('refreshBtn');
 const refreshIcon = document.getElementById('refreshIcon');
+const liveStatusBadge = document.getElementById('liveStatusBadge');
+const offlineBanner = document.getElementById('offlineBanner');
 
 // KPIs
 const kpiSpotUsdtBrl = document.getElementById('kpiSpotUsdtBrl');
@@ -93,7 +96,15 @@ document.addEventListener('DOMContentLoaded', () => {
     startCountdown();
 });
 
-// Configuração PWA (Instalação no Celular)
+window.addEventListener('online', () => {
+    fetchQuotes(true);
+});
+
+window.addEventListener('offline', () => {
+    setOfflineState('Sem conexão com a Internet no celular');
+});
+
+// Configuração PWA
 function setupPwa() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(err => {
@@ -127,7 +138,7 @@ function setupPwa() {
     if (installPwaBtnDesktop) installPwaBtnDesktop.addEventListener('click', handleInstall);
 }
 
-// Configuração do Gráfico Chart.js com Pontos Grandes e Visíveis
+// Configuração do Gráfico Chart.js
 function initChart() {
     const ctx = document.getElementById('rateHistoryChart').getContext('2d');
     historyChart = new Chart(ctx, {
@@ -142,12 +153,12 @@ function initChart() {
                 borderWidth: 3,
                 tension: 0.25,
                 fill: true,
-                pointBackgroundColor: '#f0b90b', // Dourado Binance
-                pointBorderColor: '#ffffff',     // Borda branca
+                pointBackgroundColor: '#f0b90b',
+                pointBorderColor: '#ffffff',
                 pointBorderWidth: 2.5,
-                pointRadius: 6,                  // Raio grande de 6px
+                pointRadius: 6,
                 pointHoverRadius: 10,
-                pointHitRadius: 40               // Área de toque fácil no celular
+                pointHitRadius: 40
             }]
         },
         options: {
@@ -227,28 +238,7 @@ function initChart() {
 
 function getActiveHistoryList() {
     if (!currentQuotes) return [];
-    let list = currentTimeframe === '24h' ? (currentQuotes.history_24h || []) : (currentQuotes.history_1h || []);
-    
-    // Se por qualquer razão estiver vazio, gera 24 pontos realistas baseados na cotação atual
-    if (list.length === 0 && currentQuotes.rate_brl_bob_raw) {
-        const baseRate = currentQuotes.rate_brl_bob_raw;
-        const now = new Date();
-        list = [];
-        for (let i = 23; i >= 0; i--) {
-            const d = new Date(now.getTime() - i * 3600000);
-            const hourStr = d.getHours().toString().padStart(2, '0') + ':00';
-            const varFactor = 1 + ((i % 5 - 2) * 0.0008);
-            const rate = parseFloat((baseRate * varFactor).toFixed(4));
-            list.push({
-                timestamp: hourStr,
-                full_time: `${d.toLocaleDateString('pt-BR')} ${hourStr}`,
-                rate_brl_bob: rate,
-                spot_usdt_brl: currentQuotes.spot_usdt_brl?.ask || 5.213,
-                p2p_usdt_bob: currentQuotes.best_p2p_bob || 11.91
-            });
-        }
-    }
-    return list;
+    return currentTimeframe === '24h' ? (currentQuotes.history_24h || []) : (currentQuotes.history_1h || []);
 }
 
 function updateInspector(index) {
@@ -319,6 +309,8 @@ function setupEventListeners() {
 
     customP2pPriceInput.addEventListener('input', (e) => {
         customP2pPriceSelected = e.target.value ? parseFloat(e.target.value) : null;
+        customP2pNickSelected = null;
+        if (currentQuotes) renderKPIs(currentQuotes);
         runSimulation();
     });
     customSpotFeeInput.addEventListener('input', runSimulation);
@@ -467,23 +459,46 @@ function resetCountdown() {
     startCountdown();
 }
 
+function setLiveState() {
+    liveStatusBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Ao Vivo';
+    liveStatusBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+    offlineBanner.classList.add('hidden');
+}
+
+function setOfflineState(reason = 'Cotações pausadas') {
+    liveStatusBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Offline';
+    liveStatusBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-rose-500/20 text-rose-300 border border-rose-500/30';
+    offlineBanner.classList.remove('hidden');
+}
+
 // Busca Cotações no Backend
 async function fetchQuotes(isManual = false) {
     if (isManual) {
         refreshIcon.classList.add('fa-spin');
     }
     try {
-        const res = await fetch('/api/quotes');
+        const url = isManual ? (`/api/quotes?force=1&t=${Date.now()}`) : (`/api/quotes?t=${Date.now()}`);
+        const res = await fetch(url, { cache: 'no-store', headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' } });
         if (res.ok) {
             const data = await res.json();
             currentQuotes = data;
+            
+            if (data.is_live) {
+                setLiveState();
+            } else {
+                setOfflineState('Sem conexão recente com a Binance');
+            }
+            
             renderKPIs(data);
             renderP2PTable(data.p2p_ads_bob || []);
             renderHistoryChart(data);
             runSimulation();
+        } else {
+            setOfflineState('Servidor fora do ar');
         }
     } catch (err) {
         console.error('Erro ao buscar cotações:', err);
+        setOfflineState('Sem conexão com a internet');
     } finally {
         if (isManual) {
             setTimeout(() => refreshIcon.classList.remove('fa-spin'), 600);
@@ -491,63 +506,85 @@ async function fetchQuotes(isManual = false) {
     }
 }
 
-// Renderiza Cards de Indicadores (KPIs)
+// Renderiza Cards de Indicadores (KPIs) - Sincronizado com Preço P2P Selecionado
 function renderKPIs(data) {
-    if (!data.spot_usdt_brl) return;
+    if (!data.spot_usdt_brl) {
+        kpiSpotUsdtBrl.textContent = '--';
+        kpiP2pUsdtBob.textContent = '--';
+        kpiRawRate.textContent = '--';
+        kpiCommercialRate.textContent = '--';
+        return;
+    }
 
-    // Spot
     const spotAsk = data.spot_usdt_brl.ask;
     const spotBid = data.spot_usdt_brl.bid;
     kpiSpotUsdtBrl.textContent = spotAsk.toFixed(4);
     kpiSpotSpread.textContent = (spotAsk - spotBid).toFixed(4);
 
-    // P2P BOB
-    kpiP2pUsdtBob.textContent = data.best_p2p_bob.toFixed(2);
-    kpiP2pTop3.textContent = data.top3_avg_bob.toFixed(2);
-
-    // Câmbio Bruto
-    kpiRawRate.textContent = data.rate_brl_bob_raw.toFixed(4);
-    kpiRawRateInverse.textContent = `R$ ${data.rate_bob_brl_raw.toFixed(4)}`;
-
-    // Câmbio Comercial
-    let commercialRate = data.rate_brl_bob_raw;
-    if (currentMarginType === 'SMART_TIER') {
-        const amountVal = parseFloat(inputAmount.value) || 1000;
-        if (amountVal < 500) {
-            commercialRate = data.rate_brl_bob_raw * (1 - (7.0 / (amountVal || 300)));
-            kpiMarginBadge.textContent = 'LUCRO: R$ 7 FIXO';
-        } else if (amountVal < 1000) {
-            commercialRate = data.rate_brl_bob_raw * (1 - (10.0 / (amountVal || 500)));
-            kpiMarginBadge.textContent = 'LUCRO: R$ 10 FIXO';
+    // Preço P2P efetivo: usa o selecionado pelo usuário ou o melhor da API
+    const effectiveP2p = customP2pPriceSelected || data.best_p2p_bob;
+    
+    if (effectiveP2p) {
+        kpiP2pUsdtBob.textContent = effectiveP2p.toFixed(2);
+        
+        // Se fixado manualmente em um comerciante, exibe indicador com botão de resetar
+        if (customP2pPriceSelected) {
+            const nickLabel = customP2pNickSelected ? `${customP2pNickSelected.substring(0, 10)}` : 'Fixado';
+            kpiP2pTop3.innerHTML = `<span class="text-binanceYellow font-bold flex items-center gap-1 cursor-pointer" onclick="resetP2pPriceToAuto()"><i class="fa-solid fa-lock text-[9px]"></i> ${nickLabel} <span class="underline text-[9px] text-slate-400 hover:text-white ml-0.5">(↺ Auto)</span></span>`;
         } else {
-            commercialRate = data.rate_brl_bob_raw * (1 - (currentMarginValue / 100.0));
-            kpiMarginBadge.textContent = `LUCRO: ${currentMarginValue}%`;
+            kpiP2pTop3.textContent = data.top3_avg_bob ? data.top3_avg_bob.toFixed(2) : '--';
         }
-    } else if (currentMarginType === 'PERCENT') {
-        commercialRate = data.rate_brl_bob_raw * (1 - (currentMarginValue / 100.0));
-        kpiMarginBadge.textContent = `LUCRO: ${currentMarginValue}%`;
-    } else if (currentMarginType === 'FIXED_PER_BOB') {
-        commercialRate = Math.max(0.01, data.rate_brl_bob_raw - currentMarginValue);
-        kpiMarginBadge.textContent = `LUCRO: -${currentMarginValue} Bs/R$`;
-    } else {
-        kpiMarginBadge.textContent = `TAXA: R$ ${currentMarginValue}`;
-    }
 
-    const commercialInverse = commercialRate > 0 ? (1.0 / commercialRate) : 0;
-    kpiCommercialRate.textContent = commercialRate.toFixed(4);
-    kpiCommercialInverse.textContent = `R$ ${commercialInverse.toFixed(4)}`;
+        // Câmbio Bruto Efetivo com base no P2P ativo
+        const effectiveRawRate = (1.0 / spotAsk) * effectiveP2p;
+        const effectiveRawInverse = effectiveRawRate > 0 ? (1.0 / effectiveRawRate) : 0;
+        
+        kpiRawRate.textContent = effectiveRawRate.toFixed(4);
+        kpiRawRateInverse.textContent = `R$ ${effectiveRawInverse.toFixed(4)}`;
+
+        // Câmbio Comercial Efetivo
+        let commercialRate = effectiveRawRate;
+        const amountVal = parseFloat(inputAmount.value) || 1000;
+
+        if (currentMarginType === 'SMART_TIER') {
+            if (amountVal < 500) {
+                commercialRate = effectiveRawRate * (1 - (7.0 / (amountVal || 300)));
+                kpiMarginBadge.textContent = 'LUCRO: R$ 7 FIXO';
+            } else if (amountVal < 1000) {
+                commercialRate = effectiveRawRate * (1 - (10.0 / (amountVal || 500)));
+                kpiMarginBadge.textContent = 'LUCRO: R$ 10 FIXO';
+            } else {
+                commercialRate = effectiveRawRate * (1 - (currentMarginValue / 100.0));
+                kpiMarginBadge.textContent = `LUCRO: ${currentMarginValue}%`;
+            }
+        } else if (currentMarginType === 'PERCENT') {
+            commercialRate = effectiveRawRate * (1 - (currentMarginValue / 100.0));
+            kpiMarginBadge.textContent = `LUCRO: ${currentMarginValue}%`;
+        } else if (currentMarginType === 'FIXED_PER_BOB') {
+            commercialRate = Math.max(0.01, effectiveRawRate - currentMarginValue);
+            kpiMarginBadge.textContent = `LUCRO: -${currentMarginValue} Bs/R$`;
+        } else {
+            kpiMarginBadge.textContent = `TAXA: R$ ${currentMarginValue}`;
+        }
+
+        const commercialInverse = commercialRate > 0 ? (1.0 / commercialRate) : 0;
+        kpiCommercialRate.textContent = commercialRate.toFixed(4);
+        kpiCommercialInverse.textContent = `R$ ${commercialInverse.toFixed(4)}`;
+    }
 }
 
 // Renderiza Tabela de Ofertas P2P
 function renderP2PTable(ads) {
     if (!ads || ads.length === 0) {
-        p2pTableBody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-slate-500">Nenhum anunciante verificado online no momento.</td></tr>`;
+        p2pTableBody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-slate-500">Nenhum anunciante de venda verificado online no momento.</td></tr>`;
         return;
     }
 
     let html = '';
-    ads.slice(0, 8).forEach((ad, idx) => {
-        const isBest = idx === 0;
+    ads.slice(0, 20).forEach((ad, idx) => {
+        const isSelected = customP2pPriceSelected === ad.price;
+        const isBest = idx === 0 && !customP2pPriceSelected;
+        
         const methodsBadges = ad.trade_methods.slice(0, 2).map(m => {
             let color = 'bg-slate-800 text-slate-300 border-slate-700';
             if (m.toLowerCase().includes('union')) color = 'bg-blue-500/10 text-blue-300 border-blue-500/30';
@@ -556,14 +593,19 @@ function renderP2PTable(ads) {
             return `<span class="inline-block px-1.5 py-0.2 text-[8px] sm:text-[9px] rounded border ${color} font-medium mr-1 mb-0.5 truncate max-w-[90px]">${m}</span>`;
         }).join('');
 
+        const buttonStyle = isSelected 
+            ? 'bg-binanceYellow text-black font-black ring-2 ring-yellow-400' 
+            : 'bg-cardBorder hover:bg-binanceYellow hover:text-black text-slate-200';
+
         html += `
-            <tr class="hover:bg-slate-800/40 transition-colors ${isBest ? 'bg-binanceYellow/5' : ''}">
+            <tr class="hover:bg-slate-800/40 transition-colors ${isSelected ? 'bg-binanceYellow/10 border-l-2 border-binanceYellow' : (isBest ? 'bg-binanceYellow/5' : '')}">
                 <td class="py-2 sm:py-2.5 pr-1 sm:pr-2">
                     <div class="flex items-center gap-1 flex-wrap">
                         <span class="font-bold text-white text-[11px] sm:text-xs truncate max-w-[100px] sm:max-w-[130px]">${ad.nick_name}</span>
                         <span class="text-[8px] sm:text-[9px] px-1 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold rounded flex items-center gap-0.5">
                             <i class="fa-solid fa-circle-check text-[7px]"></i> Verif.
                         </span>
+                        ${isSelected ? '<span class="text-[8px] px-1 py-0.2 bg-binanceYellow text-black font-extrabold rounded">ATIVO</span>' : ''}
                     </div>
                     <div class="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">
                         <span class="text-emerald-400 font-semibold">${ad.month_finish_rate}%</span> (${ad.month_order_count} ordens)
@@ -578,8 +620,8 @@ function renderP2PTable(ads) {
                     <div class="text-[8px] sm:text-[9px] text-slate-500">até ${formatNumber(ad.max_amount)}</div>
                 </td>
                 <td class="py-2 sm:py-2.5 text-center align-top">
-                    <button onclick="applyP2pPrice(${ad.price})" class="px-2 py-1 bg-cardBorder hover:bg-binanceYellow hover:text-black rounded text-[9px] sm:text-[10px] font-bold text-slate-200 transition-all shadow-sm">
-                        Usar
+                    <button onclick="applyP2pPrice(${ad.price}, '${ad.nick_name}')" class="px-2 py-1 ${buttonStyle} rounded text-[9px] sm:text-[10px] font-bold transition-all shadow-sm">
+                        ${isSelected ? 'Ativo' : 'Usar'}
                     </button>
                 </td>
             </tr>
@@ -588,14 +630,37 @@ function renderP2PTable(ads) {
     p2pTableBody.innerHTML = html;
 }
 
-window.applyP2pPrice = function(price) {
+// Aplica preço do comerciante selecionado em toda a interface
+window.applyP2pPrice = function(price, nickName = 'Comerciante') {
     customP2pPriceInput.value = price;
     customP2pPriceSelected = price;
-    showToast(`Preço P2P fixado em ${price} Bs.`);
+    customP2pNickSelected = nickName;
+    
+    if (currentQuotes) {
+        renderKPIs(currentQuotes);
+        renderP2PTable(currentQuotes.p2p_ads_bob || []);
+    }
+    
+    showToast(`Cotação P2P fixada em ${price.toFixed(2)} Bs. (${nickName})`);
     runSimulation();
 };
 
-// Renderiza Gráfico Histórico Garantindo Pontos Visíveis
+// Reseta para melhor cotação automática
+window.resetP2pPriceToAuto = function() {
+    customP2pPriceInput.value = '';
+    customP2pPriceSelected = null;
+    customP2pNickSelected = null;
+    
+    if (currentQuotes) {
+        renderKPIs(currentQuotes);
+        renderP2PTable(currentQuotes.p2p_ads_bob || []);
+    }
+    
+    showToast('Cotação P2P voltou para o Automático (Melhor Oferta ao Vivo)!');
+    runSimulation();
+};
+
+// Renderiza Gráfico Histórico
 function renderHistoryChart(data) {
     if (!historyChart) return;
     
@@ -616,7 +681,6 @@ function renderHistoryChart(data) {
     historyChart.data.datasets[0].data = dataRates;
     historyChart.update();
 
-    // Atualiza o Inspector com o último ponto por padrão
     updateInspector(historyList.length - 1);
 }
 
@@ -679,13 +743,11 @@ function renderSimulationResults(data) {
     }
 }
 
-// Utilitário de Formatação de Números
 function formatNumber(num) {
     if (num === undefined || num === null) return '0,00';
     return Number(num).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Gerador de Mensagem WhatsApp
 function generateWhatsappMessage() {
     if (!currentSimulation) return '';
 
