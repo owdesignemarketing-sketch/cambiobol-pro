@@ -2,8 +2,8 @@
 let currentQuotes = null;
 let currentSimulation = null;
 let currentMode = 'BRL_TO_BOB'; // 'BRL_TO_BOB' ou 'BOB_TO_BRL'
-let currentMarginType = 'PERCENT';
-let currentMarginValue = 1.0; // Padrão 1%
+let currentMarginType = 'SMART_TIER'; // 'SMART_TIER', 'PERCENT', 'FIXED_PER_BOB', 'FIXED_PER_TX'
+let currentMarginValue = 1.0; // Padrão 1% para >= 1K
 let customP2pPriceSelected = null;
 let currentTimeframe = '24h'; // '1h' ou '24h'
 
@@ -44,6 +44,9 @@ const marginUnitLabel = document.getElementById('marginUnitLabel');
 const customP2pPriceInput = document.getElementById('customP2pPrice');
 const customSpotFeeInput = document.getElementById('customSpotFee');
 
+const smartTierBanner = document.getElementById('smartTierBanner');
+const smartTierActiveRule = document.getElementById('smartTierActiveRule');
+
 // Resultados
 const resClientHeaderLabel = document.getElementById('resClientHeaderLabel');
 const resClientPrefix = document.getElementById('resClientPrefix');
@@ -70,10 +73,14 @@ const installPwaBtnDesktop = document.getElementById('installPwaBtnDesktop');
 const toast = document.getElementById('toast');
 const toastMsg = document.getElementById('toastMsg');
 
-// Gráfico Timeframe
+// Gráfico Inspector
 const btnTimeframe1h = document.getElementById('btnTimeframe1h');
 const btnTimeframe24h = document.getElementById('btnTimeframe24h');
 const chartSubtitle = document.getElementById('chartSubtitle');
+const inspectorTimeLabel = document.getElementById('inspectorTimeLabel');
+const inspectorRateLabel = document.getElementById('inspectorRateLabel');
+const inspectorSpotLabel = document.getElementById('inspectorSpotLabel');
+const inspectorP2pLabel = document.getElementById('inspectorP2pLabel');
 
 let deferredPrompt = null;
 
@@ -120,7 +127,7 @@ function setupPwa() {
     if (installPwaBtnDesktop) installPwaBtnDesktop.addEventListener('click', handleInstall);
 }
 
-// Configuração do Gráfico Chart.js com suporte Touch Mobile
+// Configuração do Gráfico Chart.js com Pontos Super Visíveis e Auto-Escala
 function initChart() {
     const ctx = document.getElementById('rateHistoryChart').getContext('2d');
     historyChart = new Chart(ctx, {
@@ -131,16 +138,16 @@ function initChart() {
                 label: 'Câmbio BRL ➔ BOB',
                 data: [],
                 borderColor: '#10b981',
-                backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                borderWidth: 2.5,
-                tension: 0.25,
+                backgroundColor: 'rgba(16, 185, 129, 0.18)',
+                borderWidth: 3,
+                tension: 0.2,
                 fill: true,
-                pointBackgroundColor: '#10b981',
-                pointBorderColor: '#ffffff',
-                pointBorderWidth: 2,
-                pointRadius: 4.5, // Ponto destacado
-                pointHoverRadius: 8.5,
-                pointHitRadius: 35 // Área de toque de 35px para o dedo no celular
+                pointBackgroundColor: '#f0b90b', // Ponto Amarelo Ouro
+                pointBorderColor: '#ffffff',     // Borda Branca
+                pointBorderWidth: 2.5,
+                pointRadius: 6,                  // Raio grande de 6px (12px de diâmetro)
+                pointHoverRadius: 11,
+                pointHitRadius: 40               // Área de toque generosa no celular
             }]
         },
         options: {
@@ -152,14 +159,20 @@ function initChart() {
                 mode: 'nearest',
                 axis: 'x'
             },
+            onHover: (event, elements) => {
+                if (elements && elements.length > 0) {
+                    const idx = elements[0].index;
+                    updateInspector(idx);
+                }
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
                     backgroundColor: '#111827',
                     titleColor: '#f0b90b',
                     bodyColor: '#f8fafc',
-                    borderColor: '#374151',
-                    borderWidth: 1,
+                    borderColor: '#f0b90b',
+                    borderWidth: 1.5,
                     padding: 12,
                     boxPadding: 4,
                     usePointStyle: true,
@@ -190,20 +203,37 @@ function initChart() {
             },
             scales: {
                 x: {
-                    grid: { color: 'rgba(31, 41, 61, 0.4)' },
+                    grid: { color: 'rgba(31, 41, 61, 0.5)' },
                     ticks: { 
                         color: '#94a3b8', 
-                        font: { size: 9 },
-                        maxTicksLimit: 8 // Limita número de labels no eixo X para não poluir tela do celular
+                        font: { size: 10, weight: 'bold' },
+                        maxTicksLimit: 8
                     }
                 },
                 y: {
-                    grid: { color: 'rgba(31, 41, 61, 0.4)' },
-                    ticks: { color: '#94a3b8', font: { size: 9 } }
+                    grid: { color: 'rgba(31, 41, 61, 0.5)' },
+                    ticks: { 
+                        color: '#10b981', 
+                        font: { size: 10, weight: 'bold' },
+                        callback: function(val) {
+                            return Number(val).toFixed(4);
+                        }
+                    }
                 }
             }
         }
     });
+}
+
+function updateInspector(index) {
+    const historyList = currentTimeframe === '24h' ? (currentQuotes?.history_24h || []) : (currentQuotes?.history_1h || []);
+    if (!historyList || !historyList[index]) return;
+    const item = historyList[index];
+
+    inspectorTimeLabel.textContent = item.full_time ? `Ponto: ${item.full_time}` : `Horário: ${item.timestamp}`;
+    inspectorRateLabel.textContent = `1 BRL = ${Number(item.rate_brl_bob).toFixed(4)} BOB`;
+    inspectorSpotLabel.textContent = `Spot: R$ ${Number(item.spot_usdt_brl).toFixed(4)}`;
+    inspectorP2pLabel.textContent = `P2P: ${Number(item.p2p_usdt_bob).toFixed(2)} Bs.`;
 }
 
 // Configuração dos Event Listeners
@@ -219,7 +249,11 @@ function setupEventListeners() {
     });
 
     // Inputs de Cálculo
-    inputAmount.addEventListener('input', runSimulation);
+    inputAmount.addEventListener('input', () => {
+        updateSmartTierBanner();
+        runSimulation();
+    });
+
     customMarginInput.addEventListener('input', (e) => {
         currentMarginValue = parseFloat(e.target.value) || 0;
         updateMarginButtonsActiveState();
@@ -229,17 +263,23 @@ function setupEventListeners() {
     // Tipo de Margem
     marginTypeSelect.addEventListener('change', (e) => {
         currentMarginType = e.target.value;
-        if (currentMarginType === 'PERCENT') {
+        if (currentMarginType === 'SMART_TIER') {
+            smartTierBanner.classList.remove('hidden');
             marginUnitLabel.textContent = '%';
-            if (currentMarginValue > 20) currentMarginValue = 1.0;
-        } else if (currentMarginType === 'FIXED_PER_BOB') {
-            marginUnitLabel.textContent = 'R$/Bs';
-            currentMarginValue = 0.05;
         } else {
-            marginUnitLabel.textContent = 'R$';
-            currentMarginValue = 20.0;
+            smartTierBanner.classList.add('hidden');
+            if (currentMarginType === 'PERCENT') {
+                marginUnitLabel.textContent = '%';
+            } else if (currentMarginType === 'FIXED_PER_BOB') {
+                marginUnitLabel.textContent = 'R$/Bs';
+                currentMarginValue = 0.05;
+            } else {
+                marginUnitLabel.textContent = 'R$';
+                currentMarginValue = 10.0;
+            }
         }
         customMarginInput.value = currentMarginValue;
+        updateSmartTierBanner();
         updateMarginButtonsActiveState();
         runSimulation();
     });
@@ -247,9 +287,6 @@ function setupEventListeners() {
     // Botões Rápidos de Margem (0.5%, 0.75%, 1.0%, etc.)
     document.querySelectorAll('.margin-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            currentMarginType = 'PERCENT';
-            marginTypeSelect.value = 'PERCENT';
-            marginUnitLabel.textContent = '%';
             currentMarginValue = parseFloat(btn.dataset.val);
             customMarginInput.value = currentMarginValue;
             updateMarginButtonsActiveState();
@@ -282,10 +319,24 @@ function setupEventListeners() {
     btnTimeframe24h.addEventListener('click', () => setChartTimeframe('24h'));
 }
 
+function updateSmartTierBanner() {
+    if (currentMarginType !== 'SMART_TIER') return;
+    const amountVal = parseFloat(inputAmount.value) || 0;
+    
+    if (amountVal < 500) {
+        smartTierActiveRule.textContent = 'Taxa Fixa R$ 7,00 (< R$ 500)';
+    } else if (amountVal < 1000) {
+        smartTierActiveRule.textContent = 'Taxa Fixa R$ 10,00 (R$ 500 a 1K)';
+    } else {
+        smartTierActiveRule.textContent = `Margem ${currentMarginValue}% (>= R$ 1.000)`;
+    }
+}
+
 function setupQuickAmountButtons() {
     quickAmountButtonsContainer.querySelectorAll('.quick-amount-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             inputAmount.value = btn.dataset.amount;
+            updateSmartTierBanner();
             runSimulation();
         });
     });
@@ -296,11 +347,11 @@ function setChartTimeframe(tf) {
     if (tf === '1h') {
         btnTimeframe1h.className = 'timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[10px] sm:text-[11px]';
         btnTimeframe24h.className = 'timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[10px] sm:text-[11px]';
-        chartSubtitle.textContent = '*Toque ou deslize sobre os pontos para ver o câmbio a cada 1 minuto.';
+        chartSubtitle.textContent = '*Toque ou deslize o dedo nos círculos amarelos para inspecionar cada minuto.';
     } else {
         btnTimeframe24h.className = 'timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[10px] sm:text-[11px]';
         btnTimeframe1h.className = 'timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[10px] sm:text-[11px]';
-        chartSubtitle.textContent = '*Toque ou deslize sobre os pontos para ver o câmbio exato por hora.';
+        chartSubtitle.textContent = '*Toque ou deslize o dedo nos círculos amarelos para inspecionar cada hora.';
     }
     if (currentQuotes) {
         renderHistoryChart(currentQuotes);
@@ -327,10 +378,10 @@ function setMode(mode) {
         step4Label.textContent = '4. Custo p/ BOB';
 
         quickAmountButtonsContainer.innerHTML = `
+            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="300">300</button>
             <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="500">500</button>
             <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="1000">1K</button>
             <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="2000">2K</button>
-            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="5000">5K</button>
         `;
         if (inputAmount.value === '5000') inputAmount.value = '1000';
     } else {
@@ -351,20 +402,21 @@ function setMode(mode) {
         step4Label.textContent = '4. Cobrar p/ BOB';
 
         quickAmountButtonsContainer.innerHTML = `
+            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="1000">1K</button>
             <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="2000">2K</button>
             <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="5000">5K</button>
             <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="10000">10K</button>
-            <button type="button" class="quick-amount-btn px-2 py-1 bg-cardBorder hover:bg-slate-700 rounded text-[10px] sm:text-[11px] font-bold text-slate-300 transition-colors" data-amount="20000">20K</button>
         `;
         if (inputAmount.value === '1000') inputAmount.value = '5000';
     }
     setupQuickAmountButtons();
+    updateSmartTierBanner();
     runSimulation();
 }
 
 function updateMarginButtonsActiveState() {
     document.querySelectorAll('.margin-btn').forEach(btn => {
-        if (currentMarginType === 'PERCENT' && parseFloat(btn.dataset.val) === currentMarginValue) {
+        if (parseFloat(btn.dataset.val) === currentMarginValue) {
             btn.className = 'margin-btn px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] sm:text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95 flex-1 sm:flex-none text-center';
         } else {
             btn.className = 'margin-btn px-2 py-1.5 rounded-lg bg-cardBorder text-slate-300 text-[11px] sm:text-xs font-bold hover:bg-slate-700 transition-all active:scale-95 flex-1 sm:flex-none text-center';
@@ -443,7 +495,19 @@ function renderKPIs(data) {
 
     // Câmbio Comercial
     let commercialRate = data.rate_brl_bob_raw;
-    if (currentMarginType === 'PERCENT') {
+    if (currentMarginType === 'SMART_TIER') {
+        const amountVal = parseFloat(inputAmount.value) || 1000;
+        if (amountVal < 500) {
+            commercialRate = data.rate_brl_bob_raw * (1 - (7.0 / (amountVal || 300)));
+            kpiMarginBadge.textContent = 'LUCRO: R$ 7 FIXO';
+        } else if (amountVal < 1000) {
+            commercialRate = data.rate_brl_bob_raw * (1 - (10.0 / (amountVal || 500)));
+            kpiMarginBadge.textContent = 'LUCRO: R$ 10 FIXO';
+        } else {
+            commercialRate = data.rate_brl_bob_raw * (1 - (currentMarginValue / 100.0));
+            kpiMarginBadge.textContent = `LUCRO: ${currentMarginValue}%`;
+        }
+    } else if (currentMarginType === 'PERCENT') {
         commercialRate = data.rate_brl_bob_raw * (1 - (currentMarginValue / 100.0));
         kpiMarginBadge.textContent = `LUCRO: ${currentMarginValue}%`;
     } else if (currentMarginType === 'FIXED_PER_BOB') {
@@ -515,7 +579,7 @@ window.applyP2pPrice = function(price) {
     runSimulation();
 };
 
-// Renderiza Gráfico Histórico (1h ou 24h)
+// Renderiza Gráfico Histórico com Auto-Escala Precisa
 function renderHistoryChart(data) {
     if (!historyChart) return;
     
@@ -523,11 +587,22 @@ function renderHistoryChart(data) {
     if (!historyList || historyList.length === 0) return;
     
     const labels = historyList.map(h => h.timestamp);
-    const dataRates = historyList.map(h => h.rate_brl_bob);
+    const dataRates = historyList.map(h => parseFloat(h.rate_brl_bob));
+    
+    // Auto-escala dinâmica para os pontos se destacarem com nitidez
+    const minVal = Math.min(...dataRates);
+    const maxVal = Math.max(...dataRates);
+    const padding = (maxVal - minVal) * 0.25 || 0.002;
+    
+    historyChart.options.scales.y.min = Math.max(0, minVal - padding);
+    historyChart.options.scales.y.max = maxVal + padding;
     
     historyChart.data.labels = labels;
     historyChart.data.datasets[0].data = dataRates;
     historyChart.update();
+
+    // Atualiza o Inspector com o último ponto por padrão
+    updateInspector(historyList.length - 1);
 }
 
 // Executa Simulação
@@ -564,6 +639,10 @@ async function runSimulation() {
 
 // Renderiza Resultados da Simulação
 function renderSimulationResults(data) {
+    if (data.applied_tier_label) {
+        smartTierActiveRule.textContent = data.applied_tier_label;
+    }
+
     if (currentMode === 'BRL_TO_BOB') {
         resClientReceivesBob.textContent = formatNumber(data.bob_client_receives);
         resOperatorProfitBrl.textContent = `R$ ${formatNumber(data.profit_brl)}`;

@@ -73,10 +73,7 @@ def clean_str(val):
     return str(val).encode('utf-8', 'ignore').decode('utf-8')
 
 def fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=12, only_verified=True):
-    """
-    Busca anúncios no P2P da Binance.
-    only_verified=True: filtra apenas anunciantes verificados (PRO / Merchant).
-    """
+    """Busca anúncios no P2P da Binance com comerciantes verificados."""
     try:
         url = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
         payload = {
@@ -115,7 +112,7 @@ def fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=12, only
             if len(ads_list) > 0:
                 return ads_list
                 
-        # Se com filtro de merchant vier vazio, busca geral como fallback
+        # Se vazio com merchantCheck, tenta fallback
         if only_verified:
             return fetch_binance_p2p(asset=asset, fiat=fiat, trade_type=trade_type, rows=rows, only_verified=False)
             
@@ -199,7 +196,7 @@ def update_all_quotes():
     except Exception as e:
         print(f"Erro em update_all_quotes: {e}")
 
-# Thread de atualização em segundo plano (a cada 10 segundos para manter tudo fresco)
+# Thread de atualização em segundo plano
 def background_updater():
     while True:
         try:
@@ -248,7 +245,7 @@ def simulate():
         data = request.json or {}
         mode = data.get("mode", "BRL_TO_BOB") # 'BRL_TO_BOB' ou 'BOB_TO_BRL'
         amount = float(data.get("amount", 1000) or 1000)
-        profit_margin_type = data.get("profit_margin_type", "PERCENT") # 'PERCENT', 'FIXED_PER_BOB', 'FIXED_PER_TX'
+        profit_margin_type = data.get("profit_margin_type", "SMART_TIER") # 'SMART_TIER', 'PERCENT', 'FIXED_PER_BOB', 'FIXED_PER_TX'
         profit_margin_value = float(data.get("profit_margin_value", 1.0) or 1.0)
         spot_fee_percent = float(data.get("spot_fee_percent", 0.075) or 0.075)
         custom_p2p_price = data.get("custom_p2p_price")
@@ -272,10 +269,11 @@ def simulate():
         if p2p_price <= 0: p2p_price = 12.10
         if amount <= 0: amount = 1000.0
             
-        # Câmbio Bruto Puro (1 BRL gera X BOB na Binance)
         raw_bob_per_brl = (1.0 / spot_price) * (1.0 - (spot_fee_percent / 100.0)) * p2p_price
         raw_brl_per_bob = 1.0 / raw_bob_per_brl if raw_bob_per_brl > 0 else 0
         
+        applied_tier_label = ""
+
         if mode == "BRL_TO_BOB":
             # CLIENTE ENVIA BRL NO PIX -> RECEBE BOB NA BOLIVIA
             brl_input = amount
@@ -284,7 +282,29 @@ def simulate():
             usdt_net = usdt_bought_raw - spot_fee_usdt
             bob_gross = usdt_net * p2p_price
             
-            if profit_margin_type == "PERCENT":
+            if profit_margin_type == "SMART_TIER":
+                # REGRA INTELIGENTE DE PRECIFICAÇÃO:
+                # < 500: R$ 7,00 fixo
+                # >= 500 e < 1000: R$ 10,00 fixo
+                # >= 1000: percentual (ex: 1.0%)
+                if brl_input < 500:
+                    profit_brl = 7.00
+                    applied_tier_label = "Taxa Fixa R$ 7 (< R$ 500)"
+                    brl_for_exchange = max(1.0, brl_input - profit_brl)
+                    bob_client_receives = (brl_for_exchange / spot_price) * (1.0 - (spot_fee_percent / 100.0)) * p2p_price
+                    profit_bob = bob_gross - bob_client_receives
+                elif brl_input < 1000:
+                    profit_brl = 10.00
+                    applied_tier_label = "Taxa Fixa R$ 10 (R$ 500 a 1K)"
+                    brl_for_exchange = max(1.0, brl_input - profit_brl)
+                    bob_client_receives = (brl_for_exchange / spot_price) * (1.0 - (spot_fee_percent / 100.0)) * p2p_price
+                    profit_bob = bob_gross - bob_client_receives
+                else:
+                    applied_tier_label = f"Margem {profit_margin_value}% (>= 1K)"
+                    profit_bob = bob_gross * (profit_margin_value / 100.0)
+                    bob_client_receives = bob_gross - profit_bob
+                    profit_brl = (profit_bob / p2p_price) * spot_price
+            elif profit_margin_type == "PERCENT":
                 profit_bob = bob_gross * (profit_margin_value / 100.0)
                 bob_client_receives = bob_gross - profit_bob
                 profit_brl = (profit_bob / p2p_price) * spot_price
@@ -293,7 +313,7 @@ def simulate():
                 bob_client_receives = brl_input * commercial_rate
                 profit_bob = bob_gross - bob_client_receives
                 profit_brl = (profit_bob / p2p_price) * spot_price
-            else: # FIXED_PER_TX (Taxa fixa em R$)
+            else: # FIXED_PER_TX
                 profit_brl = min(brl_input * 0.5, profit_margin_value)
                 brl_for_exchange = brl_input - profit_brl
                 bob_client_receives = (brl_for_exchange / spot_price) * (1.0 - (spot_fee_percent / 100.0)) * p2p_price
@@ -317,6 +337,7 @@ def simulate():
                 "raw_bob_per_brl": round(raw_bob_per_brl, 4),
                 "commercial_bob_per_brl": round(commercial_bob_per_brl, 4),
                 "commercial_brl_per_bob": round(commercial_brl_per_bob, 4),
+                "applied_tier_label": applied_tier_label
             })
 
         else: 
@@ -325,8 +346,25 @@ def simulate():
             usdt_needed = bob_target / p2p_price
             brl_cost_pure = (usdt_needed * spot_price) / (1.0 - (spot_fee_percent / 100.0))
             
-            if profit_margin_type == "PERCENT":
-                # Cobramos brl_charge de modo que o lucro seja exatamente profit_margin_value%
+            if profit_margin_type == "SMART_TIER":
+                if brl_cost_pure < 500:
+                    profit_brl = 7.00
+                    applied_tier_label = "Taxa Fixa R$ 7 (< R$ 500)"
+                    brl_charge_client = brl_cost_pure + 7.00
+                    profit_bob = (profit_brl / spot_price) * p2p_price
+                elif brl_cost_pure < 1000:
+                    profit_brl = 10.00
+                    applied_tier_label = "Taxa Fixa R$ 10 (R$ 500 a 1K)"
+                    brl_charge_client = brl_cost_pure + 10.00
+                    profit_bob = (profit_brl / spot_price) * p2p_price
+                else:
+                    applied_tier_label = f"Margem {profit_margin_value}% (>= 1K)"
+                    margin_factor = 1.0 - (profit_margin_value / 100.0)
+                    if margin_factor <= 0.1: margin_factor = 0.95
+                    brl_charge_client = brl_cost_pure / margin_factor
+                    profit_brl = brl_charge_client - brl_cost_pure
+                    profit_bob = (profit_brl / spot_price) * p2p_price
+            elif profit_margin_type == "PERCENT":
                 margin_factor = 1.0 - (profit_margin_value / 100.0)
                 if margin_factor <= 0.1: margin_factor = 0.95
                 brl_charge_client = brl_cost_pure / margin_factor
@@ -360,6 +398,7 @@ def simulate():
                 "raw_bob_per_brl": round(raw_bob_per_brl, 4),
                 "commercial_bob_per_brl": round(commercial_bob_per_brl, 4),
                 "commercial_brl_per_bob": round(commercial_brl_per_bob, 4),
+                "applied_tier_label": applied_tier_label
             })
     except Exception as e:
         print(f"Erro em /api/simulate: {e}")
