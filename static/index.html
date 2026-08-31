@@ -406,6 +406,20 @@
                             </tbody>
                         </table>
                     </div>
+                    
+                    <!-- Paginação P2P (10 por página) -->
+                    <div class="flex items-center justify-between pt-2.5 mt-2 border-t border-cardBorder/40 text-xs">
+                        <button id="p2pPrevBtn" class="px-2.5 py-1 bg-cardBorder hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed font-bold rounded text-[10px] transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-chevron-left text-[8px]"></i> Anterior
+                        </button>
+                        <span id="p2pPageIndicator" class="font-mono text-[10px] text-slate-300 font-semibold bg-darkBg px-2 py-0.5 rounded border border-cardBorder">
+                            Página 1 de 2 (Top 1-10)
+                        </span>
+                        <button id="p2pNextBtn" class="px-2.5 py-1 bg-cardBorder hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed font-bold rounded text-[10px] transition-all flex items-center gap-1">
+                            Próxima <i class="fa-solid fa-chevron-right text-[8px]"></i>
+                        </button>
+                    </div>
+
                     <p class="text-[9px] sm:text-[10px] text-slate-500 mt-2.5 italic">*Clique em "Usar" para aplicar a cotação de qualquer comerciante.</p>
                 </div>
 

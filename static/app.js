@@ -573,17 +573,58 @@ function renderKPIs(data) {
     }
 }
 
-// Renderiza Tabela de Ofertas P2P
+let p2pCurrentPage = 1;
+const p2pPrevBtn = document.getElementById('p2pPrevBtn');
+const p2pNextBtn = document.getElementById('p2pNextBtn');
+const p2pPageIndicator = document.getElementById('p2pPageIndicator');
+
+if (p2pPrevBtn) {
+    p2pPrevBtn.addEventListener('click', () => {
+        if (p2pCurrentPage > 1) {
+            p2pCurrentPage--;
+            if (currentQuotes) renderP2PTable(currentQuotes.p2p_ads_bob || []);
+        }
+    });
+}
+
+if (p2pNextBtn) {
+    p2pNextBtn.addEventListener('click', () => {
+        const totalPages = Math.ceil((currentQuotes?.p2p_ads_bob?.length || 0) / 10) || 1;
+        if (p2pCurrentPage < totalPages) {
+            p2pCurrentPage++;
+            if (currentQuotes) renderP2PTable(currentQuotes.p2p_ads_bob || []);
+        }
+    });
+}
+
+// Renderiza Tabela de Ofertas P2P (10 por página)
 function renderP2PTable(ads) {
     if (!ads || ads.length === 0) {
         p2pTableBody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-slate-500">Nenhum anunciante de venda verificado online no momento.</td></tr>`;
+        if (p2pPageIndicator) p2pPageIndicator.textContent = '0 de 0';
         return;
     }
 
+    const pageSize = 10;
+    const totalPages = Math.ceil(ads.length / pageSize) || 1;
+    if (p2pCurrentPage > totalPages) p2pCurrentPage = totalPages;
+    if (p2pCurrentPage < 1) p2pCurrentPage = 1;
+
+    const startIdx = (p2pCurrentPage - 1) * pageSize;
+    const endIdx = Math.min(startIdx + pageSize, ads.length);
+    const pageAds = ads.slice(startIdx, endIdx);
+
+    if (p2pPageIndicator) {
+        p2pPageIndicator.textContent = `Página ${p2pCurrentPage} de ${totalPages} (Top ${startIdx + 1}-${endIdx})`;
+    }
+    if (p2pPrevBtn) p2pPrevBtn.disabled = p2pCurrentPage <= 1;
+    if (p2pNextBtn) p2pNextBtn.disabled = p2pCurrentPage >= totalPages;
+
     let html = '';
-    ads.slice(0, 20).forEach((ad, idx) => {
+    pageAds.forEach((ad, idx) => {
+        const globalIdx = startIdx + idx;
         const isSelected = customP2pPriceSelected === ad.price;
-        const isBest = idx === 0 && !customP2pPriceSelected;
+        const isBest = globalIdx === 0 && !customP2pPriceSelected;
         
         const methodsBadges = ad.trade_methods.slice(0, 2).map(m => {
             let color = 'bg-slate-800 text-slate-300 border-slate-700';

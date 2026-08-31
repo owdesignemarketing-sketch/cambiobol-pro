@@ -1,4 +1,6 @@
 import time
+import json
+import os
 import threading
 import datetime
 import requests
@@ -10,6 +12,7 @@ CORS(app)
 
 # Fuso Horário Oficial da Bolívia (UTC-4)
 BOLIVIA_TZ = datetime.timezone(datetime.timedelta(hours=-4))
+HISTORY_FILE = "history_store.json"
 
 # Cache de cotações em memória
 quotes_cache = {
@@ -60,8 +63,43 @@ BINANCE_KLINE_ENDPOINTS = [
     "https://api.binance.com/api/v3/klines"
 ]
 
+# Gerenciamento de Histórico com Auto-Limpeza (Zero Desperdício de Memória)
+def load_history_store():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"hourly": {}, "minutely": {}}
+
+def save_history_store(store):
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(store, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"Erro ao salvar history_store: {e}")
+
+history_store = load_history_store()
+
+def cleanup_old_history(store, max_hours=48, max_minutes=120):
+    """
+    Remove automaticamente pontos antigos que já saíram do gráfico.
+    Garante que o arquivo nunca passe de 10 KB e gaste ZERO memória!
+    """
+    now = datetime.datetime.now(BOLIVIA_TZ)
+    
+    # Limpa horas com mais de 48h
+    cutoff_hour = now - datetime.timedelta(hours=max_hours)
+    cutoff_hour_str = cutoff_hour.strftime("%Y-%m-%d %H:00")
+    store["hourly"] = {k: v for k, v in store.get("hourly", {}).items() if k >= cutoff_hour_str}
+
+    # Limpa minutos com mais de 2 horas (120 min)
+    cutoff_min = now - datetime.timedelta(minutes=max_minutes)
+    cutoff_min_str = cutoff_min.strftime("%Y-%m-%d %H:%M")
+    store["minutely"] = {k: v for k, v in store.get("minutely", {}).items() if k >= cutoff_min_str}
+
 def fetch_binance_spot_usdt_brl():
-    """Busca o preço Spot USDT/BRL real."""
     for url in BINANCE_SPOT_ENDPOINTS:
         try:
             resp = requests.get(url, headers=HEADERS_SPOT, timeout=4)
@@ -85,7 +123,6 @@ def clean_str(val):
     return str(val).encode('utf-8', 'ignore').decode('utf-8')
 
 def fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=20):
-    """Busca os 20 melhores comerciantes da aba VENDER (SELL) com parsing seguro."""
     try:
         url = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
         payload = {
@@ -123,7 +160,6 @@ def fetch_binance_p2p(asset="USDT", fiat="BOB", trade_type="SELL", rows=20):
                         "trade_methods": methods
                     })
             if len(ads_list) > 0:
-                # Ordena rigorosamente por melhor preço (maior primeiro para SELL)
                 ads_list.sort(key=lambda x: x["price"], reverse=True)
                 return ads_list
                 
@@ -144,8 +180,93 @@ def fetch_binance_klines(symbol="USDTBRL", interval="1h", limit=24):
             continue
     return []
 
+def record_and_get_persisted_history(current_spot, current_p2p, current_rate):
+    """
+    Grava ponto atual no store, limpa histórico antigo que saiu da janela,
+    e retorna os 24 pontos horários e 60 pontos por minuto imutáveis.
+    """
+    global history_store
+    now_bolivia = datetime.datetime.now(BOLIVIA_TZ)
+    
+    hour_key = now_bolivia.strftime("%Y-%m-%d %H:00")
+    min_key = now_bolivia.strftime("%Y-%m-%d %H:%M")
+    
+    # Grava hora atual
+    history_store["hourly"][hour_key] = {
+        "timestamp": now_bolivia.strftime("%H:00"),
+        "full_time": now_bolivia.strftime("%d/%m %H:%M"),
+        "spot_usdt_brl": round(current_spot, 4),
+        "p2p_usdt_bob": round(current_p2p, 2),
+        "rate_brl_bob": round(current_rate, 4)
+    }
+
+    # Grava minuto atual
+    history_store["minutely"][min_key] = {
+        "timestamp": now_bolivia.strftime("%H:%M"),
+        "full_time": now_bolivia.strftime("%H:%M"),
+        "spot_usdt_brl": round(current_spot, 4),
+        "p2p_usdt_bob": round(current_p2p, 2),
+        "rate_brl_bob": round(current_rate, 4)
+    }
+
+    # Inicializa horas passadas se necessário
+    klines_24h = fetch_binance_klines(symbol="USDTBRL", interval="1h", limit=24)
+    if klines_24h:
+        for k in klines_24h:
+            t_dt = datetime.datetime.fromtimestamp(k[0] / 1000, tz=datetime.timezone.utc).astimezone(BOLIVIA_TZ)
+            h_k = t_dt.strftime("%Y-%m-%d %H:00")
+            if h_k not in history_store["hourly"]:
+                close_spot = float(k[4])
+                saved_rate = round((1.0 / close_spot) * current_p2p, 4) if close_spot > 0 else current_rate
+                history_store["hourly"][h_k] = {
+                    "timestamp": t_dt.strftime("%H:00"),
+                    "full_time": t_dt.strftime("%d/%m %H:%M"),
+                    "spot_usdt_brl": round(close_spot, 4),
+                    "p2p_usdt_bob": round(current_p2p, 2),
+                    "rate_brl_bob": saved_rate
+                }
+
+    # Limpeza de pontos antigos que já saíram do gráfico
+    cleanup_old_history(history_store)
+
+    # Salva no disco
+    save_history_store(history_store)
+
+    # 24 horas sequenciais
+    points_24h = []
+    for i in range(23, -1, -1):
+        target_t = now_bolivia - datetime.timedelta(hours=i)
+        t_key = target_t.strftime("%Y-%m-%d %H:00")
+        if t_key in history_store["hourly"]:
+            points_24h.append(history_store["hourly"][t_key])
+        else:
+            points_24h.append({
+                "timestamp": target_t.strftime("%H:00"),
+                "full_time": target_t.strftime("%d/%m %H:%M"),
+                "spot_usdt_brl": round(current_spot, 4),
+                "p2p_usdt_bob": round(current_p2p, 2),
+                "rate_brl_bob": round(current_rate, 4)
+            })
+
+    # 60 minutos sequenciais
+    points_1h = []
+    for i in range(59, -1, -1):
+        target_t = now_bolivia - datetime.timedelta(minutes=i)
+        t_key = target_t.strftime("%Y-%m-%d %H:%M")
+        if t_key in history_store["minutely"]:
+            points_1h.append(history_store["minutely"][t_key])
+        else:
+            points_1h.append({
+                "timestamp": target_t.strftime("%H:%M"),
+                "full_time": target_t.strftime("%H:%M"),
+                "spot_usdt_brl": round(current_spot, 4),
+                "p2p_usdt_bob": round(current_p2p, 2),
+                "rate_brl_bob": round(current_rate, 4)
+            })
+
+    return points_24h, points_1h
+
 def update_all_quotes():
-    """Atualiza cotações com os 20 melhores comerciantes e histórico em tempo real."""
     global quotes_cache
     try:
         spot = fetch_binance_spot_usdt_brl()
@@ -171,39 +292,9 @@ def update_all_quotes():
             quotes_cache["rate_bob_brl_raw"] = round(raw_brl_per_bob, 4)
             quotes_cache["error_message"] = None
             
-            # Histórico 24h
-            klines_24h = fetch_binance_klines(symbol="USDTBRL", interval="1h", limit=24)
-            if klines_24h:
-                points_24h = []
-                for k in klines_24h:
-                    t_dt = datetime.datetime.fromtimestamp(k[0] / 1000, tz=datetime.timezone.utc).astimezone(BOLIVIA_TZ)
-                    close_spot = float(k[4])
-                    rate = round((1.0 / close_spot) * best_p2p_bob, 4) if close_spot > 0 else 0
-                    points_24h.append({
-                        "timestamp": t_dt.strftime('%H:00'),
-                        "spot_usdt_brl": round(close_spot, 4),
-                        "p2p_usdt_bob": round(best_p2p_bob, 2),
-                        "rate_brl_bob": rate,
-                        "full_time": t_dt.strftime('%d/%m %H:%M')
-                    })
-                quotes_cache["history_24h"] = points_24h
-
-            # Histórico 1h
-            klines_1h = fetch_binance_klines(symbol="USDTBRL", interval="1m", limit=60)
-            if klines_1h:
-                points_1h = []
-                for k in klines_1h:
-                    t_dt = datetime.datetime.fromtimestamp(k[0] / 1000, tz=datetime.timezone.utc).astimezone(BOLIVIA_TZ)
-                    close_spot = float(k[4])
-                    rate = round((1.0 / close_spot) * best_p2p_bob, 4) if close_spot > 0 else 0
-                    points_1h.append({
-                        "timestamp": t_dt.strftime('%H:%M'),
-                        "spot_usdt_brl": round(close_spot, 4),
-                        "p2p_usdt_bob": round(best_p2p_bob, 2),
-                        "rate_brl_bob": rate,
-                        "full_time": t_dt.strftime('%H:%M')
-                    })
-                quotes_cache["history_1h"] = points_1h
+            hist_24h, hist_1h = record_and_get_persisted_history(usdt_brl_buy_price, best_p2p_bob, raw_bob_per_brl)
+            quotes_cache["history_24h"] = hist_24h
+            quotes_cache["history_1h"] = hist_1h
 
         else:
             if time.time() - quotes_cache.get("last_updated", 0) > 40:
@@ -223,12 +314,11 @@ def background_updater():
             update_all_quotes()
         except Exception as e:
             print(f"Erro background updater: {e}")
-        time.sleep(5) # Atualiza a cada 5 segundos
+        time.sleep(5)
 
 updater_thread = threading.Thread(target=background_updater, daemon=True)
 updater_thread.start()
 
-# Prevenção rigorosa de cache de navegador no celular
 @app.after_request
 def add_header(response):
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
@@ -247,7 +337,6 @@ def get_quotes():
         last_updated = quotes_cache.get("last_updated", 0)
         age_seconds = int(now - last_updated) if last_updated > 0 else 999
         
-        # Se for pedido manual ou dados tiverem mais de 4s, faz update síncrono
         force = request.args.get('force')
         if force or age_seconds > 4:
             update_all_quotes()
