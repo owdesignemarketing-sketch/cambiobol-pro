@@ -5,14 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CâmbioBol Pro | Cotação em Tempo Real BRL ➔ BOB</title>
     
-    <!-- PWA & Mobile Meta Tags -->
-    <meta name="theme-color" content="#090d16">
+    <!-- PWA & Mobile Meta Tags (Android & iOS Apple Support) -->
+    <meta name="theme-color" content="#ffffff">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="CâmbioBol">
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/svg+xml" href="icon.svg">
-    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+    <link rel="shortcut icon" href="favicon.png">
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -55,8 +57,8 @@
             <!-- Logo & Status Real-Time -->
             <div class="flex items-center justify-between w-full sm:w-auto">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-binanceYellow to-emerald-400 flex items-center justify-center shadow-lg shadow-yellow-500/10 flex-shrink-0">
-                        <i class="fa-solid fa-arrow-right-arrow-left text-darkBg text-base sm:text-lg font-black"></i>
+                    <div class="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-md shadow-white/10 flex-shrink-0 border border-slate-700">
+                        <img src="logo.png" alt="WN Logo" class="w-full h-full object-contain">
                     </div>
                     <div>
                         <div class="flex items-center gap-1.5 sm:gap-2">
@@ -475,6 +477,43 @@
     <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-bold border border-emerald-400/30">
         <i class="fa-solid fa-circle-check text-base"></i>
         <span id="toastMsg">Proposta copiada com sucesso!</span>
+    </div>
+
+    <!-- Modal Instruções de Instalação no iPhone (iOS Safari) -->
+    <div id="iosInstallModal" class="hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+        <div class="bg-cardBg border border-cardBorder rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 animate-fade-in relative">
+            <button id="closeIosModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-white p-1 flex-shrink-0 flex items-center justify-center border border-slate-700 shadow-md">
+                    <img src="logo.png" alt="Logo WN" class="w-full h-full object-contain">
+                </div>
+                <div>
+                    <h3 class="font-bold text-white text-sm">Instalar no iPhone</h3>
+                    <p class="text-[11px] text-slate-400">Adicione à tela inicial em 3 passos</p>
+                </div>
+            </div>
+            
+            <div class="space-y-3 text-xs text-slate-300 pt-2 border-t border-cardBorder/50">
+                <div class="flex items-start gap-2.5">
+                    <span class="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold flex-shrink-0 text-[11px]">1</span>
+                    <p>No Safari, toque no botão <strong>Compartilhar</strong> <i class="fa-solid fa-arrow-up-from-bracket text-blue-400 mx-1"></i> (na barra inferior).</p>
+                </div>
+                <div class="flex items-start gap-2.5">
+                    <span class="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold flex-shrink-0 text-[11px]">2</span>
+                    <p>Role para baixo e toque em <strong class="text-white">"Adicionar à Tela de Início"</strong> <i class="fa-regular fa-square-plus text-emerald-400 mx-1"></i>.</p>
+                </div>
+                <div class="flex items-start gap-2.5">
+                    <span class="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold flex-shrink-0 text-[11px]">3</span>
+                    <p>Toque em <strong>"Adicionar"</strong> no canto superior direito. Pronto!</p>
+                </div>
+            </div>
+
+            <button id="gotItIosModalBtn" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all shadow-md">
+                Entendi
+            </button>
+        </div>
     </div>
 
     <!-- Main Logic Script -->

@@ -516,6 +516,28 @@ def simulate():
         print(f"Erro em /api/simulate: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/history/sync', methods=['POST'])
+def sync_history():
+    try:
+        data = request.json or {}
+        client_hourly = data.get('hourly', {})
+        client_minutely = data.get('minutely', {})
+        updated = False
+        for k, v in client_hourly.items():
+            if k not in history_store['hourly']:
+                history_store['hourly'][k] = v
+                updated = True
+        for k, v in client_minutely.items():
+            if k not in history_store['minutely']:
+                history_store['minutely'][k] = v
+                updated = True
+        if updated:
+            cleanup_old_history(history_store)
+            save_history_store(history_store)
+        return jsonify({"status": "synced", "count_hourly": len(history_store['hourly'])})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     print("Iniciando CambioBol Server na porta 5000...")
     app.run(host='0.0.0.0', port=5000, debug=False)

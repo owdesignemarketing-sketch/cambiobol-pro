@@ -112,6 +112,15 @@ function setupPwa() {
         });
     }
 
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+
+    // No iPhone (Safari) exibe o botão de instalar com instruções próprias
+    if (isIos && !isStandalone) {
+        if (installPwaBtn) installPwaBtn.classList.remove('hidden');
+        if (installPwaBtnDesktop) installPwaBtnDesktop.classList.remove('hidden');
+    }
+
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
@@ -119,7 +128,19 @@ function setupPwa() {
         if (installPwaBtnDesktop) installPwaBtnDesktop.classList.remove('hidden');
     });
 
+    const iosModal = document.getElementById('iosInstallModal');
+    const closeIosBtn = document.getElementById('closeIosModalBtn');
+    const gotItIosBtn = document.getElementById('gotItIosModalBtn');
+
+    if (closeIosBtn && iosModal) closeIosBtn.addEventListener('click', () => iosModal.classList.add('hidden'));
+    if (gotItIosBtn && iosModal) gotItIosBtn.addEventListener('click', () => iosModal.classList.add('hidden'));
+
     const handleInstall = async () => {
+        if (isIos) {
+            if (iosModal) iosModal.classList.remove('hidden');
+            return;
+        }
+
         if (deferredPrompt) {
             deferredPrompt.prompt();
             const { outcome } = await deferredPrompt.userChoice;
@@ -130,7 +151,7 @@ function setupPwa() {
             }
             deferredPrompt = null;
         } else {
-            showToast('Para instalar: no navegador, clique nos 3 pontinhos e escolha "Instalar aplicativo"');
+            showToast('Para instalar: toque no menu do navegador e escolha "Adicionar à Tela de Início"');
         }
     };
 
@@ -471,6 +492,90 @@ function setOfflineState(reason = 'Cotações pausadas') {
     offlineBanner.classList.remove('hidden');
 }
 
+// Persistência Imutável Local no Aparelho do Usuário (localStorage)
+function getSavedHistoryStore() {
+    try {
+        const raw = localStorage.getItem('cambiobol_history_cache_v3');
+        return raw ? JSON.parse(raw) : { hourly: {}, minutely: {} };
+    } catch (e) {
+        return { hourly: {}, minutely: {} };
+    }
+}
+
+function saveHistoryStoreLocal(store) {
+    try {
+        localStorage.setItem('cambiobol_history_cache_v3', JSON.stringify(store));
+    } catch (e) {}
+}
+
+function processAndPersistHistory(data) {
+    if (!data) return;
+    const store = getSavedHistoryStore();
+    let hasChanges = false;
+
+    // 1. Processa 24 Horas
+    if (data.history_24h && data.history_24h.length > 0) {
+        data.history_24h.forEach((pt, idx) => {
+            const isCurrentNow = (idx === data.history_24h.length - 1);
+            const key = pt.full_time || pt.timestamp;
+            
+            if (!isCurrentNow && store.hourly[key]) {
+                // Ponto passado: recupera o valor congelado gravado naquela hora!
+                pt.rate_brl_bob = store.hourly[key].rate_brl_bob;
+                pt.spot_usdt_brl = store.hourly[key].spot_usdt_brl;
+                pt.p2p_usdt_bob = store.hourly[key].p2p_usdt_bob;
+            } else {
+                store.hourly[key] = {
+                    rate_brl_bob: pt.rate_brl_bob,
+                    spot_usdt_brl: pt.spot_usdt_brl,
+                    p2p_usdt_bob: pt.p2p_usdt_bob,
+                    timestamp: pt.timestamp,
+                    full_time: pt.full_time
+                };
+                hasChanges = true;
+            }
+        });
+    }
+
+    // 2. Processa 1 Hora (Minutos)
+    if (data.history_1h && data.history_1h.length > 0) {
+        data.history_1h.forEach((pt, idx) => {
+            const isCurrentNow = (idx === data.history_1h.length - 1);
+            const key = pt.full_time || pt.timestamp;
+            
+            if (!isCurrentNow && store.minutely[key]) {
+                pt.rate_brl_bob = store.minutely[key].rate_brl_bob;
+                pt.spot_usdt_brl = store.minutely[key].spot_usdt_brl;
+                pt.p2p_usdt_bob = store.minutely[key].p2p_usdt_bob;
+            } else {
+                store.minutely[key] = {
+                    rate_brl_bob: pt.rate_brl_bob,
+                    spot_usdt_brl: pt.spot_usdt_brl,
+                    p2p_usdt_bob: pt.p2p_usdt_bob,
+                    timestamp: pt.timestamp,
+                    full_time: pt.full_time
+                };
+                hasChanges = true;
+            }
+        });
+    }
+
+    if (hasChanges) {
+        saveHistoryStoreLocal(store);
+        syncHistoryWithBackend(store);
+    }
+}
+
+async function syncHistoryWithBackend(store) {
+    try {
+        await fetch('/api/history/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(store)
+        });
+    } catch (e) {}
+}
+
 // Busca Cotações no Backend
 async function fetchQuotes(isManual = false) {
     if (isManual) {
@@ -489,6 +594,7 @@ async function fetchQuotes(isManual = false) {
                 setOfflineState('Sem conexão recente com a Binance');
             }
             
+            processAndPersistHistory(data);
             renderKPIs(data);
             renderP2PTable(data.p2p_ads_bob || []);
             renderHistoryChart(data);
