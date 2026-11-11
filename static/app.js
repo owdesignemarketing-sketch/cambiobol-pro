@@ -79,6 +79,7 @@ const toastMsg = document.getElementById('toastMsg');
 // Gráfico Inspector
 const btnTimeframe1h = document.getElementById('btnTimeframe1h');
 const btnTimeframe24h = document.getElementById('btnTimeframe24h');
+const btnTimeframe30d = document.getElementById('btnTimeframe30d');
 const chartSubtitle = document.getElementById('chartSubtitle');
 const inspectorTimeLabel = document.getElementById('inspectorTimeLabel');
 const inspectorRateLabel = document.getElementById('inspectorRateLabel');
@@ -259,7 +260,9 @@ function initChart() {
 
 function getActiveHistoryList() {
     if (!currentQuotes) return [];
-    return currentTimeframe === '24h' ? (currentQuotes.history_24h || []) : (currentQuotes.history_1h || []);
+    if (currentTimeframe === '1h') return currentQuotes.history_1h || [];
+    if (currentTimeframe === '30d') return currentQuotes.history_30d || [];
+    return currentQuotes.history_24h || [];
 }
 
 function updateInspector(index) {
@@ -346,6 +349,7 @@ function setupEventListeners() {
 
     btnTimeframe1h.addEventListener('click', () => setChartTimeframe('1h'));
     btnTimeframe24h.addEventListener('click', () => setChartTimeframe('24h'));
+    if (btnTimeframe30d) btnTimeframe30d.addEventListener('click', () => setChartTimeframe('30d'));
 }
 
 function updateSmartTierBanner() {
@@ -373,15 +377,23 @@ function setupQuickAmountButtons() {
 
 function setChartTimeframe(tf) {
     currentTimeframe = tf;
-    if (tf === '1h') {
-        btnTimeframe1h.className = 'timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[10px] sm:text-[11px]';
-        btnTimeframe24h.className = 'timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[10px] sm:text-[11px]';
-        chartSubtitle.textContent = '*Toque ou deslize o dedo nos círculos amarelos para inspecionar cada minuto.';
-    } else {
-        btnTimeframe24h.className = 'timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[10px] sm:text-[11px]';
-        btnTimeframe1h.className = 'timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[10px] sm:text-[11px]';
-        chartSubtitle.textContent = '*Toque ou deslize o dedo nos círculos amarelos para inspecionar cada hora.';
-    }
+    const buttons = [
+        { id: '1h', btn: btnTimeframe1h, sub: '*Oscilação minuto a minuto na última hora.' },
+        { id: '24h', btn: btnTimeframe24h, sub: '*Oscilação hora a hora nas últimas 24 horas.' },
+        { id: '30d', btn: btnTimeframe30d, sub: '*Oscilação diária nos últimos 30 dias.' }
+    ];
+
+    buttons.forEach(item => {
+        if (item.btn) {
+            if (item.id === tf) {
+                item.btn.className = 'timeframe-btn px-2.5 py-1 rounded bg-blue-600 text-white font-bold transition-all text-[10px] sm:text-[11px]';
+                chartSubtitle.textContent = item.sub;
+            } else {
+                item.btn.className = 'timeframe-btn px-2.5 py-1 rounded bg-cardBorder text-slate-300 hover:text-white transition-all text-[10px] sm:text-[11px]';
+            }
+        }
+    });
+
     if (currentQuotes) {
         renderHistoryChart(currentQuotes);
     }
@@ -492,89 +504,12 @@ function setOfflineState(reason = 'Cotações pausadas') {
     offlineBanner.classList.remove('hidden');
 }
 
-// Persistência Imutável Local no Aparelho do Usuário (localStorage)
-function getSavedHistoryStore() {
-    try {
-        const raw = localStorage.getItem('cambiobol_history_cache_v3');
-        return raw ? JSON.parse(raw) : { hourly: {}, minutely: {} };
-    } catch (e) {
-        return { hourly: {}, minutely: {} };
-    }
-}
-
-function saveHistoryStoreLocal(store) {
-    try {
-        localStorage.setItem('cambiobol_history_cache_v3', JSON.stringify(store));
-    } catch (e) {}
-}
-
-function processAndPersistHistory(data) {
-    if (!data) return;
-    const store = getSavedHistoryStore();
-    let hasChanges = false;
-
-    // 1. Processa 24 Horas
-    if (data.history_24h && data.history_24h.length > 0) {
-        data.history_24h.forEach((pt, idx) => {
-            const isCurrentNow = (idx === data.history_24h.length - 1);
-            const key = pt.full_time || pt.timestamp;
-            
-            if (!isCurrentNow && store.hourly[key]) {
-                // Ponto passado: recupera o valor congelado gravado naquela hora!
-                pt.rate_brl_bob = store.hourly[key].rate_brl_bob;
-                pt.spot_usdt_brl = store.hourly[key].spot_usdt_brl;
-                pt.p2p_usdt_bob = store.hourly[key].p2p_usdt_bob;
-            } else {
-                store.hourly[key] = {
-                    rate_brl_bob: pt.rate_brl_bob,
-                    spot_usdt_brl: pt.spot_usdt_brl,
-                    p2p_usdt_bob: pt.p2p_usdt_bob,
-                    timestamp: pt.timestamp,
-                    full_time: pt.full_time
-                };
-                hasChanges = true;
-            }
-        });
-    }
-
-    // 2. Processa 1 Hora (Minutos)
-    if (data.history_1h && data.history_1h.length > 0) {
-        data.history_1h.forEach((pt, idx) => {
-            const isCurrentNow = (idx === data.history_1h.length - 1);
-            const key = pt.full_time || pt.timestamp;
-            
-            if (!isCurrentNow && store.minutely[key]) {
-                pt.rate_brl_bob = store.minutely[key].rate_brl_bob;
-                pt.spot_usdt_brl = store.minutely[key].spot_usdt_brl;
-                pt.p2p_usdt_bob = store.minutely[key].p2p_usdt_bob;
-            } else {
-                store.minutely[key] = {
-                    rate_brl_bob: pt.rate_brl_bob,
-                    spot_usdt_brl: pt.spot_usdt_brl,
-                    p2p_usdt_bob: pt.p2p_usdt_bob,
-                    timestamp: pt.timestamp,
-                    full_time: pt.full_time
-                };
-                hasChanges = true;
-            }
-        });
-    }
-
-    if (hasChanges) {
-        saveHistoryStoreLocal(store);
-        syncHistoryWithBackend(store);
-    }
-}
-
-async function syncHistoryWithBackend(store) {
-    try {
-        await fetch('/api/history/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(store)
-        });
-    } catch (e) {}
-}
+// Limpeza preventiva de caches legados corrompidos do navegador
+try {
+    localStorage.removeItem('cambiobol_history_cache_v3');
+    localStorage.removeItem('cambiobol_history_cache_v2');
+    localStorage.removeItem('cambiobol_history_cache');
+} catch (e) {}
 
 // Busca Cotações no Backend
 async function fetchQuotes(isManual = false) {
@@ -594,7 +529,6 @@ async function fetchQuotes(isManual = false) {
                 setOfflineState('Sem conexão recente com a Binance');
             }
             
-            processAndPersistHistory(data);
             renderKPIs(data);
             renderP2PTable(data.p2p_ads_bob || []);
             renderHistoryChart(data);
@@ -824,6 +758,17 @@ function renderHistoryChart(data) {
     historyChart.options.scales.y.min = Math.max(0, parseFloat((minVal - padding).toFixed(4)));
     historyChart.options.scales.y.max = parseFloat((maxVal + padding).toFixed(4));
     
+    if (currentTimeframe === '30d') {
+        historyChart.options.scales.x.ticks.maxTicksLimit = 10;
+        historyChart.data.datasets[0].pointRadius = 4;
+    } else if (currentTimeframe === '1h') {
+        historyChart.options.scales.x.ticks.maxTicksLimit = 8;
+        historyChart.data.datasets[0].pointRadius = 3;
+    } else {
+        historyChart.options.scales.x.ticks.maxTicksLimit = 8;
+        historyChart.data.datasets[0].pointRadius = 5;
+    }
+
     historyChart.data.labels = labels;
     historyChart.data.datasets[0].data = dataRates;
     historyChart.update();
