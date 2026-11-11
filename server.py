@@ -26,6 +26,7 @@ quotes_cache = {
     "rate_bob_brl_raw": None,
     "history_1h": [],
     "history_24h": [],
+    "history_30d": [],
     "error_message": None
 }
 
@@ -63,41 +64,45 @@ BINANCE_KLINE_ENDPOINTS = [
     "https://api.binance.com/api/v3/klines"
 ]
 
-# Gerenciamento de Histórico com Auto-Limpeza (Zero Desperdício de Memória)
+# Gerenciamento de Histórico com Auto-Limpeza
 def load_history_store():
     if os.path.exists(HISTORY_FILE):
         try:
             with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {"hourly": {}, "minutely": {}}
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return {
+                        "daily_p2p": data.get("daily_p2p", {}),
+                        "hourly_p2p": data.get("hourly_p2p", {}),
+                        "minutely_p2p": data.get("minutely_p2p", {})
+                    }
+        except Exception as e:
+            print(f"Aviso ao ler {HISTORY_FILE}: {e}")
+    return {"daily_p2p": {}, "hourly_p2p": {}, "minutely_p2p": {}}
 
 def save_history_store(store):
     try:
         with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(store, f, ensure_ascii=False)
+            json.dump(store, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"Erro ao salvar history_store: {e}")
+        print(f"Erro ao salvar {HISTORY_FILE}: {e}")
 
 history_store = load_history_store()
 
-def cleanup_old_history(store, max_hours=48, max_minutes=120):
+def cleanup_old_history(store):
     """
-    Remove automaticamente pontos antigos que já saíram do gráfico.
-    Garante que o arquivo nunca passe de 10 KB e gaste ZERO memória!
+    Remove pontos antigos fora do limite do gráfico para economizar memória e disco.
+    Mantém 120 minutos (2h), 72 horas (3 dias) e 60 dias (2 meses).
     """
     now = datetime.datetime.now(BOLIVIA_TZ)
-    
-    # Limpa horas com mais de 48h
-    cutoff_hour = now - datetime.timedelta(hours=max_hours)
-    cutoff_hour_str = cutoff_hour.strftime("%Y-%m-%d %H:00")
-    store["hourly"] = {k: v for k, v in store.get("hourly", {}).items() if k >= cutoff_hour_str}
+    cutoff_min = (now - datetime.timedelta(minutes=120)).strftime("%Y-%m-%d %H:%M")
+    store["minutely_p2p"] = {k: v for k, v in store.get("minutely_p2p", {}).items() if k >= cutoff_min}
 
-    # Limpa minutos com mais de 2 horas (120 min)
-    cutoff_min = now - datetime.timedelta(minutes=max_minutes)
-    cutoff_min_str = cutoff_min.strftime("%Y-%m-%d %H:%M")
-    store["minutely"] = {k: v for k, v in store.get("minutely", {}).items() if k >= cutoff_min_str}
+    cutoff_hour = (now - datetime.timedelta(hours=72)).strftime("%Y-%m-%d %H:00")
+    store["hourly_p2p"] = {k: v for k, v in store.get("hourly_p2p", {}).items() if k >= cutoff_hour}
+
+    cutoff_day = (now - datetime.timedelta(days=60)).strftime("%Y-%m-%d")
+    store["daily_p2p"] = {k: v for k, v in store.get("daily_p2p", {}).items() if k >= cutoff_day}
 
 def fetch_binance_spot_usdt_brl():
     for url in BINANCE_SPOT_ENDPOINTS:
@@ -182,89 +187,89 @@ def fetch_binance_klines(symbol="USDTBRL", interval="1h", limit=24):
 
 def record_and_get_persisted_history(current_spot, current_p2p, current_rate):
     """
-    Grava ponto atual no store, limpa histórico antigo que saiu da janela,
-    e retorna os 24 pontos horários e 60 pontos por minuto imutáveis.
+    Grava os pontos P2P em tempo real de forma imutável para o passado,
+    e cruza com os candlesticks reais da Binance para 1h, 24h e 30 dias.
     """
     global history_store
     now_bolivia = datetime.datetime.now(BOLIVIA_TZ)
     
-    hour_key = now_bolivia.strftime("%Y-%m-%d %H:00")
     min_key = now_bolivia.strftime("%Y-%m-%d %H:%M")
-    
-    # Grava hora atual
-    history_store["hourly"][hour_key] = {
-        "timestamp": now_bolivia.strftime("%H:00"),
-        "full_time": now_bolivia.strftime("%d/%m %H:%M"),
-        "spot_usdt_brl": round(current_spot, 4),
-        "p2p_usdt_bob": round(current_p2p, 2),
-        "rate_brl_bob": round(current_rate, 4)
-    }
+    hour_key = now_bolivia.strftime("%Y-%m-%d %H:00")
+    day_key = now_bolivia.strftime("%Y-%m-%d")
 
-    # Grava minuto atual
-    history_store["minutely"][min_key] = {
-        "timestamp": now_bolivia.strftime("%H:%M"),
-        "full_time": now_bolivia.strftime("%H:%M"),
-        "spot_usdt_brl": round(current_spot, 4),
-        "p2p_usdt_bob": round(current_p2p, 2),
-        "rate_brl_bob": round(current_rate, 4)
-    }
+    if "minutely_p2p" not in history_store: history_store["minutely_p2p"] = {}
+    if "hourly_p2p" not in history_store: history_store["hourly_p2p"] = {}
+    if "daily_p2p" not in history_store: history_store["daily_p2p"] = {}
 
-    # Inicializa horas passadas se necessário
+    # Grava cotação P2P do momento presente (nunca sobrescreve o passado)
+    history_store["minutely_p2p"][min_key] = current_p2p
+    history_store["hourly_p2p"][hour_key] = current_p2p
+    history_store["daily_p2p"][day_key] = current_p2p
+
+    cleanup_old_history(history_store)
+    save_history_store(history_store)
+
+    # 1. HISTÓRICO 1 HORA (60 minutos com candlesticks 1m 100% reais da Binance)
+    klines_1m = fetch_binance_klines(symbol="USDTBRL", interval="1m", limit=60)
+    points_1h = []
+    if klines_1m:
+        for k in klines_1m:
+            t_dt = datetime.datetime.fromtimestamp(k[0] / 1000, tz=datetime.timezone.utc).astimezone(BOLIVIA_TZ)
+            m_k = t_dt.strftime("%Y-%m-%d %H:%M")
+            h_k = t_dt.strftime("%Y-%m-%d %H:00")
+            d_k = t_dt.strftime("%Y-%m-%d")
+            
+            p2p_val = history_store["minutely_p2p"].get(m_k) or history_store["hourly_p2p"].get(h_k) or history_store["daily_p2p"].get(d_k) or current_p2p
+            close_spot = float(k[4])
+            rate = round((1.0 / close_spot) * p2p_val, 4) if close_spot > 0 else current_rate
+            points_1h.append({
+                "timestamp": t_dt.strftime("%H:%M"),
+                "full_time": t_dt.strftime("%d/%m %H:%M"),
+                "spot_usdt_brl": round(close_spot, 4),
+                "p2p_usdt_bob": round(p2p_val, 2),
+                "rate_brl_bob": rate
+            })
+
+    # 2. HISTÓRICO 24 HORAS (24 horas com candlesticks 1h 100% reais da Binance)
     klines_24h = fetch_binance_klines(symbol="USDTBRL", interval="1h", limit=24)
+    points_24h = []
     if klines_24h:
         for k in klines_24h:
             t_dt = datetime.datetime.fromtimestamp(k[0] / 1000, tz=datetime.timezone.utc).astimezone(BOLIVIA_TZ)
             h_k = t_dt.strftime("%Y-%m-%d %H:00")
-            if h_k not in history_store["hourly"]:
-                close_spot = float(k[4])
-                saved_rate = round((1.0 / close_spot) * current_p2p, 4) if close_spot > 0 else current_rate
-                history_store["hourly"][h_k] = {
-                    "timestamp": t_dt.strftime("%H:00"),
-                    "full_time": t_dt.strftime("%d/%m %H:%M"),
-                    "spot_usdt_brl": round(close_spot, 4),
-                    "p2p_usdt_bob": round(current_p2p, 2),
-                    "rate_brl_bob": saved_rate
-                }
-
-    # Limpeza de pontos antigos que já saíram do gráfico
-    cleanup_old_history(history_store)
-
-    # Salva no disco
-    save_history_store(history_store)
-
-    # 24 horas sequenciais
-    points_24h = []
-    for i in range(23, -1, -1):
-        target_t = now_bolivia - datetime.timedelta(hours=i)
-        t_key = target_t.strftime("%Y-%m-%d %H:00")
-        if t_key in history_store["hourly"]:
-            points_24h.append(history_store["hourly"][t_key])
-        else:
+            d_k = t_dt.strftime("%Y-%m-%d")
+            
+            p2p_val = history_store["hourly_p2p"].get(h_k) or history_store["daily_p2p"].get(d_k) or current_p2p
+            close_spot = float(k[4])
+            rate = round((1.0 / close_spot) * p2p_val, 4) if close_spot > 0 else current_rate
             points_24h.append({
-                "timestamp": target_t.strftime("%H:00"),
-                "full_time": target_t.strftime("%d/%m %H:%M"),
-                "spot_usdt_brl": round(current_spot, 4),
-                "p2p_usdt_bob": round(current_p2p, 2),
-                "rate_brl_bob": round(current_rate, 4)
+                "timestamp": t_dt.strftime("%H:00"),
+                "full_time": t_dt.strftime("%d/%m %H:00"),
+                "spot_usdt_brl": round(close_spot, 4),
+                "p2p_usdt_bob": round(p2p_val, 2),
+                "rate_brl_bob": rate
             })
 
-    # 60 minutos sequenciais
-    points_1h = []
-    for i in range(59, -1, -1):
-        target_t = now_bolivia - datetime.timedelta(minutes=i)
-        t_key = target_t.strftime("%Y-%m-%d %H:%M")
-        if t_key in history_store["minutely"]:
-            points_1h.append(history_store["minutely"][t_key])
-        else:
-            points_1h.append({
-                "timestamp": target_t.strftime("%H:%M"),
-                "full_time": target_t.strftime("%H:%M"),
-                "spot_usdt_brl": round(current_spot, 4),
-                "p2p_usdt_bob": round(current_p2p, 2),
-                "rate_brl_bob": round(current_rate, 4)
+    # 3. HISTÓRICO 30 DIAS (30 dias com candlesticks diários 1d 100% reais da Binance)
+    klines_30d = fetch_binance_klines(symbol="USDTBRL", interval="1d", limit=30)
+    points_30d = []
+    if klines_30d:
+        for k in klines_30d:
+            t_dt = datetime.datetime.fromtimestamp(k[0] / 1000, tz=datetime.timezone.utc).astimezone(BOLIVIA_TZ)
+            d_k = t_dt.strftime("%Y-%m-%d")
+            
+            p2p_val = history_store["daily_p2p"].get(d_k) or current_p2p
+            close_spot = float(k[4])
+            rate = round((1.0 / close_spot) * p2p_val, 4) if close_spot > 0 else current_rate
+            points_30d.append({
+                "timestamp": t_dt.strftime("%d/%m"),
+                "full_time": t_dt.strftime("%d/%m/%Y"),
+                "spot_usdt_brl": round(close_spot, 4),
+                "p2p_usdt_bob": round(p2p_val, 2),
+                "rate_brl_bob": rate
             })
 
-    return points_24h, points_1h
+    return points_24h, points_1h, points_30d
 
 def update_all_quotes():
     global quotes_cache
@@ -292,9 +297,10 @@ def update_all_quotes():
             quotes_cache["rate_bob_brl_raw"] = round(raw_brl_per_bob, 4)
             quotes_cache["error_message"] = None
             
-            hist_24h, hist_1h = record_and_get_persisted_history(usdt_brl_buy_price, best_p2p_bob, raw_bob_per_brl)
+            hist_24h, hist_1h, hist_30d = record_and_get_persisted_history(usdt_brl_buy_price, best_p2p_bob, raw_bob_per_brl)
             quotes_cache["history_24h"] = hist_24h
             quotes_cache["history_1h"] = hist_1h
+            quotes_cache["history_30d"] = hist_30d
 
         else:
             if time.time() - quotes_cache.get("last_updated", 0) > 40:
@@ -365,7 +371,8 @@ def get_quotes():
             "p2p_ads_bob": quotes_cache.get("p2p_usdt_bob", []),
             "available_banks": sorted(list(all_methods)),
             "history_1h": quotes_cache.get("history_1h", []),
-            "history_24h": quotes_cache.get("history_24h", [])
+            "history_24h": quotes_cache.get("history_24h", []),
+            "history_30d": quotes_cache.get("history_30d", [])
         })
     except Exception as e:
         return jsonify({"error": str(e), "status": "error"}), 500
@@ -514,28 +521,6 @@ def simulate():
             })
     except Exception as e:
         print(f"Erro em /api/simulate: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/history/sync', methods=['POST'])
-def sync_history():
-    try:
-        data = request.json or {}
-        client_hourly = data.get('hourly', {})
-        client_minutely = data.get('minutely', {})
-        updated = False
-        for k, v in client_hourly.items():
-            if k not in history_store['hourly']:
-                history_store['hourly'][k] = v
-                updated = True
-        for k, v in client_minutely.items():
-            if k not in history_store['minutely']:
-                history_store['minutely'][k] = v
-                updated = True
-        if updated:
-            cleanup_old_history(history_store)
-            save_history_store(history_store)
-        return jsonify({"status": "synced", "count_hourly": len(history_store['hourly'])})
-    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
